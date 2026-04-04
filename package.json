@@ -1,32 +1,19 @@
 {
   "name": "discord-warn-bot",
   "version": "1.0.0",
-  "description": "Bot de moderação para Discord com sistema completo de warns, cargos automáticos e logs",
+  "description": "Bot de moderação com sistema de warns (discord.js v14)",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "moderation",
-    "warns",
-    "discord.js",
-    "automation"
-  ],
-  "author": "Seu Nome",
-  "license": "MIT",
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.3.1",
-    "chalk": "^4.1.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "dev": "node --watch index.js"
   },
   "engines": {
-    "node": ">=16.9.0"
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5"
   }
 }
