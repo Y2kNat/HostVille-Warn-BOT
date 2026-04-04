@@ -33,7 +33,12 @@ const EMOJIS = {
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
-const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID;
+// STAFF agora direto no código
+const STAFF_ROLES = [
+  "1392306046655008891",
+  "1392306043215679599",
+  "1392306051415539774"
+];
 const WARN_1 = process.env.WARN_1;
 const WARN_2 = process.env.WARN_2;
 const WARN_3 = process.env.WARN_3;
@@ -95,6 +100,8 @@ function saveWarnsDatabase() {
         console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` Falha ao salvar banco de dados: ${error.message}`));
     }
 }
+
+let botPermissions = {};
 
 // ============================================
 // FUNÇÕES AUXILIARES E UTILITÁRIOS
@@ -757,7 +764,7 @@ async function checkStaffPermission(interaction) {
         }
 
         // Verificar se STAFF_ROLE_ID está configurado
-        if (!STAFF_ROLE_ID || STAFF_ROLE_ID === 'id_do_cargo_staff' || STAFF_ROLE_ID === 'SEU_ID_AQUI') {
+        if (!STAFF_ROLES || STAFF_ROLES.length === 0) {
             console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO CONFIG]`) + chalk.red(' STAFF_ROLE_ID não configurado corretamente no .env'));
             
             const errorEmbed = new EmbedBuilder()
@@ -794,7 +801,9 @@ async function checkStaffPermission(interaction) {
 
         // Verificar se o membro tem o cargo
         const memberRoles = member.roles.cache;
-        const hasStaffRole = memberRoles.has(STAFF_ROLE_ID);
+        const hasStaffRole = memberRoles.some(role =>
+  STAFF_ROLES.includes(role.id)
+);
         
         // DEBUG - Mostrar informações no console
         console.log(chalk.cyan(`${EMOJIS.GIT}[DEBUG PERMISSÃO]`));
