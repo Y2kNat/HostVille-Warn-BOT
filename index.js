@@ -1,7 +1,7 @@
 // ============================================
 // DISCORD WARN BOT - SISTEMA COMPLETO DE MODERAÇÃO
 // discord.js v14.14.1
-// EMOJIS COMO TEXTO: staff, ticket_tool, git, bot, staff_yellow, emoji_40, emoji_41, emoji_42, emoji_43
+// COM GUILD_ID E NOME DO CARGO NOS EMBEDS
 // ============================================
 
 require('dotenv').config();
@@ -32,6 +32,7 @@ const EMOJIS = {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = process.env.GUILD_ID;
 const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID;
 const WARN_1 = process.env.WARN_1;
 const WARN_2 = process.env.WARN_2;
@@ -44,12 +45,8 @@ if (!TOKEN || !CLIENT_ID) {
     process.exit(1);
 }
 
-if (!STAFF_ROLE_ID || STAFF_ROLE_ID === 'id_do_cargo_staff') {
-    console.log(chalk.bgYellow.black('[AVISO]') + chalk.yellow(' STAFF_ROLE_ID não configurado corretamente'));
-}
-
-if (!LOG_CHANNEL_ID || LOG_CHANNEL_ID === 'id_do_canal_de_logs') {
-    console.log(chalk.bgYellow.black('[AVISO]') + chalk.yellow(' LOG_CHANNEL_ID não configurado corretamente'));
+if (!GUILD_ID) {
+    console.log(chalk.bgYellow.black('[AVISO]') + chalk.yellow(' GUILD_ID não configurado. Recomendado para funcionamento correto.'));
 }
 
 // Arquivo de armazenamento de warns
@@ -57,12 +54,8 @@ const WARNS_FILE = path.join(__dirname, 'warns.json');
 
 // Estrutura de dados para warns
 let warnsDatabase = new Map();
-let botPermissions = {
-    hasManageRoles: false,
-    hasKickMembers: false,
-    hasSendMessages: false,
-    hasViewChannel: false
-};
+let cachedStaffRoleName = null;
+let cachedGuild = null;
 
 // ============================================
 // FUNÇÕES DE ARQUIVO E PERSISTÊNCIA
@@ -139,6 +132,36 @@ function getWarnLevelIcon(warnCount) {
     if (warnCount === 1) return EMOJIS.EMOJI_41;
     if (warnCount === 2) return EMOJIS.EMOJI_42;
     return EMOJIS.EMOJI_40;
+}
+
+// ============================================
+// FUNÇÃO PARA BUSCAR NOME DO CARGO STAFF
+// ============================================
+
+async function getStaffRoleName(client) {
+    if (cachedStaffRoleName) return cachedStaffRoleName;
+    
+    try {
+        if (!GUILD_ID || GUILD_ID === 'seu_guild_id_aqui') {
+            return 'Cargo Staff (configure GUILD_ID)';
+        }
+        
+        const guild = await client.guilds.fetch(GUILD_ID);
+        cachedGuild = guild;
+        
+        if (STAFF_ROLE_ID && STAFF_ROLE_ID !== 'id_do_cargo_staff') {
+            const role = await guild.roles.fetch(STAFF_ROLE_ID);
+            if (role) {
+                cachedStaffRoleName = role.name;
+                return cachedStaffRoleName;
+            }
+        }
+        
+        return 'Cargo Staff (não encontrado)';
+    } catch (error) {
+        console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Buscar nome do cargo: ${error.message}`));
+        return 'Cargo Staff';
+    }
 }
 
 // ============================================
@@ -221,7 +244,6 @@ class WarnManager {
 
             const removedWarn = currentWarns.splice(warnIndex, 1)[0];
             
-            // Renumerar warns restantes
             currentWarns.forEach((warn, idx) => {
                 warn.warnNumber = idx + 1;
             });
@@ -401,7 +423,6 @@ class PunishmentManager {
     async sendWarningDM(member, warnCount, warnReason, warnId) {
         try {
             let dmEmbed;
-            const userTag = member.user.tag;
             
             if (warnCount === 2) {
                 dmEmbed = new EmbedBuilder()
@@ -436,7 +457,7 @@ class PunishmentManager {
             }
             
             await member.send({ embeds: [dmEmbed] });
-            console.log(chalk.green(`${EMOJIS.EMOJI_43}[DM] Mensagem enviada para ${userTag} (${warnCount} warns)`));
+            console.log(chalk.green(`${EMOJIS.EMOJI_43}[DM] Mensagem enviada para ${member.user.tag} (${warnCount} warns)`));
             return { success: true };
         } catch (error) {
             if (error.code === 50007) {
@@ -714,11 +735,12 @@ const commands = [
 ];
 
 // ============================================
-// VERIFICAÇÃO DE PERMISSÃO STAFF - CORRIGIDA
+// VERIFICAÇÃO DE PERMISSÃO STAFF - CORRIGIDA COM NOME DO CARGO
 // ============================================
 
 async function checkStaffPermission(interaction) {
     try {
+        // Aguardar o guild estar disponível
         await interaction.guild?.fetch();
         
         const member = interaction.member;
@@ -734,6 +756,7 @@ async function checkStaffPermission(interaction) {
             return false;
         }
 
+        // Verificar se STAFF_ROLE_ID está configurado
         if (!STAFF_ROLE_ID || STAFF_ROLE_ID === 'id_do_cargo_staff' || STAFF_ROLE_ID === 'SEU_ID_AQUI') {
             console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO CONFIG]`) + chalk.red(' STAFF_ROLE_ID não configurado corretamente no .env'));
             
@@ -753,48 +776,42 @@ async function checkStaffPermission(interaction) {
             return false;
         }
 
+        // Buscar o cargo para obter o NOME (não o ID)
         let staffRole = null;
+        let staffRoleName = 'Cargo Staff';
+        
         try {
             staffRole = await interaction.guild.roles.fetch(STAFF_ROLE_ID);
-            if (!staffRole) {
+            if (staffRole) {
+                staffRoleName = staffRole.name;
+                console.log(chalk.green(`${EMOJIS.EMOJI_43}[DEBUG] Cargo staff encontrado: ${staffRoleName} (ID: ${STAFF_ROLE_ID})`));
+            } else {
                 console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` Cargo ${STAFF_ROLE_ID} não encontrado no servidor`));
-                
-                const errorEmbed = new EmbedBuilder()
-                    .setColor('#E74C3C')
-                    .setTitle(`${EMOJIS.EMOJI_40} CARGO NÃO ENCONTRADO`)
-                    .setDescription(`O cargo de staff com ID \`${STAFF_ROLE_ID}\` não foi encontrado neste servidor.`)
-                    .addFields(
-                        { name: '🔧 Soluções', value: '• Verifique se o ID está correto\n• O cargo ainda existe no servidor?\n• O bot tem permissão para ver cargos?', inline: false }
-                    )
-                    .setTimestamp();
-                
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-                return false;
             }
         } catch (error) {
             console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Falha ao buscar cargo: ${error.message}`));
         }
 
+        // Verificar se o membro tem o cargo
         const memberRoles = member.roles.cache;
         const hasStaffRole = memberRoles.has(STAFF_ROLE_ID);
         
+        // DEBUG - Mostrar informações no console
         console.log(chalk.cyan(`${EMOJIS.GIT}[DEBUG PERMISSÃO]`));
         console.log(chalk.gray(`├─ Usuário: ${member.user.tag}`));
+        console.log(chalk.gray(`├─ Cargo Staff Nome: ${staffRoleName}`));
         console.log(chalk.gray(`├─ Cargo Staff ID: ${STAFF_ROLE_ID}`));
-        console.log(chalk.gray(`├─ Nome do cargo: ${staffRole?.name || 'Não encontrado'}`));
         console.log(chalk.gray(`├─ Tem o cargo? ${hasStaffRole ? 'SIM ✓' : 'NÃO ✗'}`));
-        console.log(chalk.gray(`├─ Cargos do usuário: ${memberRoles.map(r => `${r.name} (${r.id})`).join(', ') || 'Nenhum'}`));
+        console.log(chalk.gray(`├─ Cargos do usuário: ${memberRoles.map(r => `${r.name}`).join(', ') || 'Nenhum'}`));
         
+        // Se não tiver o cargo staff - MOSTRA O NOME DO CARGO, NÃO O ID
         if (!hasStaffRole) {
-            const roleName = staffRole ? staffRole.name : 'Cargo Staff';
-            
             const denyEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} ACESSO NEGADO`)
                 .setDescription('Você não tem permissão para executar este comando.')
                 .addFields(
-                    { name: '🔑 Cargo Necessário', value: `\`${roleName}\``, inline: true },
-                    { name: '🆔 ID do Cargo', value: `\`${STAFF_ROLE_ID}\``, inline: true },
+                    { name: '🔑 Cargo Necessário', value: `\`${staffRoleName}\``, inline: true },
                     { name: `${EMOJIS.STAFF} Seus Cargos`, value: memberRoles.map(r => `\`${r.name}\``).join(', ') || '`Nenhum cargo`', inline: false },
                     { name: '📌 Ação', value: 'Este comando é restrito à equipe de moderação', inline: false }
                 )
@@ -803,11 +820,11 @@ async function checkStaffPermission(interaction) {
                 .setTimestamp();
 
             await interaction.reply({ embeds: [denyEmbed], ephemeral: true });
-            console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO NEGADA]`) + chalk.yellow(` ${member.user.tag} tentou usar ${interaction.commandName} sem o cargo staff`));
+            console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO NEGADA]`) + chalk.yellow(` ${member.user.tag} tentou usar ${interaction.commandName} sem o cargo ${staffRoleName}`));
             return false;
         }
 
-        console.log(chalk.green(`${EMOJIS.EMOJI_43}[PERMISSÃO OK] ${member.user.tag} autorizado para ${interaction.commandName}`));
+        console.log(chalk.green(`${EMOJIS.EMOJI_43}[PERMISSÃO OK] ${member.user.tag} (${staffRoleName}) autorizado para ${interaction.commandName}`));
         return true;
 
     } catch (error) {
@@ -824,6 +841,10 @@ async function checkStaffPermission(interaction) {
         return false;
     }
 }
+
+// ============================================
+// VERIFICAÇÃO DE PERMISSÃO DO BOT
+// ============================================
 
 async function checkBotPermissionsForAction(interaction, action) {
     try {
@@ -864,7 +885,7 @@ async function checkBotPermissionsForAction(interaction, action) {
         console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] checkBotPermissionsForAction: ${error.message}`));
         return false;
     }
-                                                                           }
+}
 // ============================================
 // HANDLER DO COMANDO /warnstats
 // ============================================
