@@ -1,6 +1,3 @@
-// ===============================
-// 📦 IMPORTS
-// ===============================
 require('dotenv').config();
 
 const {
@@ -18,10 +15,10 @@ const chalk = require('chalk');
 const fs = require('fs');
 const path = require('path');
 
-// ===============================
-// 🔐 ENV CHECK
-// ===============================
-const requiredEnvs = [
+// ========================================
+// 🔐 VALIDAÇÃO DE ENV
+// ========================================
+const REQUIRED_ENVS = [
   'TOKEN',
   'CLIENT_ID',
   'STAFF_ROLE_ID',
@@ -31,44 +28,75 @@ const requiredEnvs = [
   'LOG_CHANNEL_ID'
 ];
 
-for (const env of requiredEnvs) {
+for (const env of REQUIRED_ENVS) {
   if (!process.env[env]) {
-    console.log(chalk.red(`[ERRO] Variável de ambiente faltando: ${env}`));
+    console.log(chalk.red(`[ERRO CRÍTICO] Variável faltando: ${env}`));
     process.exit(1);
   }
 }
 
-// ===============================
-// 🧠 DATABASE (JSON)
-// ===============================
-const dbPath = path.join(__dirname, 'warns.json');
+// ========================================
+// 📁 BANCO DE DADOS (JSON)
+// ========================================
+const DB_PATH = path.join(__dirname, 'warns.json');
 
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({}));
+// cria se não existir
+if (!fs.existsSync(DB_PATH)) {
+  fs.writeFileSync(DB_PATH, JSON.stringify({}, null, 2));
 }
 
+// carregar DB
 function loadDB() {
-  return JSON.parse(fs.readFileSync(dbPath));
+  try {
+    const raw = fs.readFileSync(DB_PATH);
+    return JSON.parse(raw);
+  } catch (err) {
+    console.log(chalk.red('[ERRO] Falha ao carregar DB, recriando...'));
+    return {};
+  }
 }
 
+// salvar DB
 function saveDB(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.log(chalk.red('[ERRO] Falha ao salvar DB'));
+  }
 }
 
-// ===============================
-// 🎨 CORES
-// ===============================
+// garantir usuário no DB
+function ensureUser(db, userId) {
+  if (!db[userId]) {
+    db[userId] = {
+      warns: []
+    };
+  }
+}
+
+// ========================================
+// 🎨 CORES DO SISTEMA
+// ========================================
 const COLORS = {
   SUCCESS: 0x2ECC71,
-  WARNING1: 0xF1C40F,
-  WARNING2: 0xE74C3C,
-  WARNING3: 0x2C2F33,
-  ERROR: 0xE74C3C
+  WARN1: 0xF1C40F,
+  WARN2: 0xE74C3C,
+  WARN3: 0x2C2F33,
+  ERROR: 0xE74C3C,
+  INFO: 0x3498DB
 };
 
-// ===============================
-// 🧾 LOGGER
-// ===============================
+// pegar cor por quantidade
+function getWarnColor(count) {
+  if (count === 1) return COLORS.WARN1;
+  if (count === 2) return COLORS.WARN2;
+  if (count >= 3) return COLORS.WARN3;
+  return COLORS.SUCCESS;
+}
+
+// ========================================
+// 🧾 LOGGER AVANÇADO
+// ========================================
 const logger = {
   info: (msg) => console.log(chalk.blue(`[INFO] ${msg}`)),
   success: (msg) => console.log(chalk.green(`[SUCESSO] ${msg}`)),
@@ -77,18 +105,18 @@ const logger = {
   perm: (msg) => console.log(chalk.magentaBright(`[PERMISSÃO] ${msg}`))
 };
 
-// ===============================
-// 🆔 GERADOR DE ID
-// ===============================
+// ========================================
+// 🆔 GERADOR DE ID ÚNICO
+// ========================================
 function generateWarnID() {
-  const part1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const part2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `WRN-${part1}-${part2}`;
+  const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const p2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `WRN-${p1}-${p2}`;
 }
 
-// ===============================
-// 🤖 CLIENT
-// ===============================
+// ========================================
+// 🤖 CLIENT DISCORD
+// ========================================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -98,22 +126,94 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
-// ===============================
-// ⚙️ SLASH COMMANDS
-// ===============================
+// ========================================
+// 🔧 UTIL: FORMATAR WARNS
+// ========================================
+function formatWarnList(warns) {
+  if (!warns.length) return 'Nenhum warn.';
+
+  return warns.map((warn, index) => {
+    let emoji = '🟡';
+
+    if (index === 1) emoji = '🔴';
+    if (index >= 2) emoji = '⚫';
+
+    return `${emoji} #${index + 1} ${warn.id} - ${warn.reason}`;
+  }).join('\n');
+}
+
+// ========================================
+// 🔧 UTIL: EMBED PADRÃO
+// ========================================
+function createBaseEmbed() {
+  return new EmbedBuilder()
+    .setFooter({ text: 'Sistema de Moderação' })
+    .setTimestamp();
+}
+
+// ========================================
+// 🔧 UTIL: EMBED DE ERRO
+// ========================================
+function errorEmbed(message) {
+  return createBaseEmbed()
+    .setColor(COLORS.ERROR)
+    .setTitle('❌ Erro')
+    .setDescription(message);
+}
+
+// ========================================
+// 🔧 UTIL: EMBED DE PERMISSÃO
+// ========================================
+function noPermEmbed() {
+  return createBaseEmbed()
+    .setColor(COLORS.ERROR)
+    .setTitle('🚫 Sem Permissão')
+    .setDescription('Você não possui permissão para usar este comando.');
+}
+
+// ========================================
+// 🔧 UTIL: SEGURANÇA
+// ========================================
+
+// evitar warn negativo
+function safeCount(n) {
+  return n < 0 ? 0 : n;
+}
+
+// evitar self action
+function isSelf(interaction, target) {
+  return interaction.user.id === target.id;
+}
+
+// ========================================
+// 🔧 UTIL: LOG NO DISCORD
+// ========================================
+async function sendLog(guild, embed) {
+  try {
+    const channel = guild.channels.cache.get(process.env.LOG_CHANNEL_ID);
+    if (!channel) return;
+
+    await channel.send({ embeds: [embed] });
+  } catch (err) {
+    logger.error(`Falha log: ${err.message}`);
+  }
+}
+// ========================================
+// 🌍 SLASH COMMANDS
+// ========================================
 const commands = [
   new SlashCommandBuilder()
     .setName('warnstats')
     .setDescription('Ver warns de um usuário')
     .addUserOption(opt =>
       opt.setName('usuario')
-        .setDescription('Usuário')
+        .setDescription('Usuário alvo')
         .setRequired(false)
     ),
 
   new SlashCommandBuilder()
     .setName('addwarn')
-    .setDescription('Adicionar warn')
+    .setDescription('Adicionar warn a um usuário')
     .addUserOption(opt =>
       opt.setName('usuario')
         .setDescription('Usuário alvo')
@@ -127,7 +227,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('removewarn')
-    .setDescription('Remover warn')
+    .setDescription('Remover warn de um usuário')
     .addUserOption(opt =>
       opt.setName('usuario')
         .setDescription('Usuário alvo')
@@ -135,9 +235,9 @@ const commands = [
     )
 ];
 
-// ===============================
-// 🌍 REGISTRO GLOBAL
-// ===============================
+// ========================================
+// 🌐 REGISTRO GLOBAL (SEM GUILD)
+// ========================================
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 async function registerCommands() {
@@ -149,49 +249,55 @@ async function registerCommands() {
       { body: commands.map(cmd => cmd.toJSON()) }
     );
 
-    logger.success('Comandos registrados globalmente.');
+    logger.success('Comandos registrados com sucesso.');
   } catch (err) {
     logger.error(`Erro ao registrar comandos: ${err.message}`);
   }
 }
 
-// ===============================
-// 🛠️ UTIL: PERMISSÃO STAFF
-// ===============================
-function isStaff(member) {
-  return member.roles.cache.has(process.env.STAFF_ROLE_ID);
-}
-
-// ===============================
-// 🛠️ UTIL: CORES POR WARN
-// ===============================
-function getColorByWarns(count) {
-  if (count === 1) return COLORS.WARNING1;
-  if (count === 2) return COLORS.WARNING2;
-  if (count >= 3) return COLORS.WARNING3;
-  return COLORS.SUCCESS;
-}
-
-// ===============================
-// 🛠️ UTIL: FORMATAR WARNS
-// ===============================
-function formatWarnList(warns) {
-  if (!warns.length) return 'Nenhum warn.';
-
-  return warns.map((w, i) => {
-    let emoji = '🟡';
-    if (i === 1) emoji = '🔴';
-    if (i === 2) emoji = '⚫';
-
-    return `${emoji} #${i + 1} ${w.id} - ${w.reason}`;
-  }).join('\n');
-}
-
-// ===============================
-// 🛠️ UTIL: GERENCIAR CARGOS
-// ===============================
-async function updateRoles(member, warnCount) {
+// ========================================
+// 🔐 PERMISSÃO STAFF (CORRIGIDA)
+// ========================================
+async function isStaff(interaction) {
   try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    return member.roles.cache.has(process.env.STAFF_ROLE_ID);
+  } catch (err) {
+    logger.perm('Falha ao verificar staff');
+    return false;
+  }
+}
+
+// ========================================
+// 🛡️ PERMISSÕES DO BOT
+// ========================================
+function checkBotPermissions(guild) {
+  const bot = guild.members.me;
+
+  const required = [
+    PermissionsBitField.Flags.ManageRoles,
+    PermissionsBitField.Flags.KickMembers,
+    PermissionsBitField.Flags.SendMessages,
+    PermissionsBitField.Flags.EmbedLinks,
+    PermissionsBitField.Flags.ViewChannel
+  ];
+
+  const missing = required.filter(p => !bot.permissions.has(p));
+
+  if (missing.length > 0) {
+    logger.perm(`Permissões faltando: ${missing.join(', ')}`);
+    return false;
+  }
+
+  return true;
+}
+
+// ========================================
+// 🎭 SISTEMA DE CARGOS (SEM BUG)
+// ========================================
+async function updateWarnRoles(member, warnCount) {
+  try {
+    // remove todos primeiro (regra: nunca acumular)
     const rolesToRemove = [
       process.env.WARN_1,
       process.env.WARN_2,
@@ -200,67 +306,157 @@ async function updateRoles(member, warnCount) {
 
     await member.roles.remove(rolesToRemove).catch(() => {});
 
+    // aplicar correto
     if (warnCount === 1) {
       await member.roles.add(process.env.WARN_1);
-    } else if (warnCount === 2) {
+    }
+
+    if (warnCount === 2) {
       await member.roles.add(process.env.WARN_2);
-    } else if (warnCount >= 3) {
-      if (process.env.WARN_3) {
-        await member.roles.add(process.env.WARN_3);
-      }
+    }
+
+    if (warnCount >= 3 && process.env.WARN_3) {
+      await member.roles.add(process.env.WARN_3);
+    }
+
+    // se 0 warns → não adiciona nada (limpo)
+    if (warnCount === 0) {
+      // já removeu tudo acima
     }
 
   } catch (err) {
-    logger.error(`Erro ao atualizar cargos: ${err.message}`);
+    logger.error(`Erro cargos: ${err.message}`);
   }
 }
 
-// ===============================
-// 🛠️ UTIL: LOG
-// ===============================
-async function sendLog(guild, embed) {
+// ========================================
+// 🧹 LIMPEZA TOTAL DE CARGOS
+// ========================================
+async function clearWarnRoles(member) {
   try {
-    const channel = guild.channels.cache.get(process.env.LOG_CHANNEL_ID);
-    if (!channel) return;
+    await member.roles.remove([
+      process.env.WARN_1,
+      process.env.WARN_2,
+      process.env.WARN_3
+    ]);
+  } catch (err) {
+    logger.error('Erro ao limpar cargos');
+  }
+}
 
-    await channel.send({ embeds: [embed] });
+// ========================================
+// 📩 DM SEGURA
+// ========================================
+async function safeDM(user, embed) {
+  try {
+    await user.send({ embeds: [embed] });
+    return true;
+  } catch (err) {
+    logger.warn(`Falha DM: ${user.tag}`);
+    return false;
+  }
+}
+
+// ========================================
+// 👢 KICK SEGURO
+// ========================================
+async function safeKick(member, reason) {
+  try {
+    if (!member.kickable) {
+      logger.error(`Não pode kickar: ${member.user.tag}`);
+      return false;
+    }
+
+    await member.kick(reason);
+    logger.success(`Kick aplicado: ${member.user.tag}`);
+    return true;
 
   } catch (err) {
-    logger.error(`Erro ao enviar log: ${err.message}`);
+    logger.error(`Erro kick: ${err.message}`);
+    return false;
   }
 }
 
-// ===============================
-// 🚀 EVENT READY
-// ===============================
+// ========================================
+// 🔍 VALIDAÇÃO GERAL (ANTI BUG)
+// ========================================
+async function validateInteraction(interaction) {
+  try {
+    // verificar permissões do bot
+    if (!checkBotPermissions(interaction.guild)) {
+      await interaction.reply({
+        embeds: [errorEmbed('O bot não possui permissões suficientes.')],
+        ephemeral: true
+      });
+      return false;
+    }
+
+    const target = interaction.options.getUser('usuario');
+
+    if (target) {
+      // evitar bot
+      if (target.bot) {
+        await interaction.reply({
+          embeds: [errorEmbed('Não é possível usar comandos em bots.')],
+          ephemeral: true
+        });
+        return false;
+      }
+
+      // evitar self
+      if (isSelf(interaction, target)) {
+        await interaction.reply({
+          embeds: [errorEmbed('Você não pode usar isso em si mesmo.')],
+          ephemeral: true
+        });
+        return false;
+      }
+    }
+
+    return true;
+
+  } catch (err) {
+    logger.error(`Erro validação: ${err.message}`);
+    return false;
+  }
+}
+// ========================================
+// 🚀 READY EVENT
+// ========================================
 client.once('ready', async () => {
   logger.success(`Bot online como ${client.user.tag}`);
   await registerCommands();
 });
 
-// ===============================
-// 🎯 INTERACTIONS
-// ===============================
+// ========================================
+// 🎯 INTERAÇÕES
+// ========================================
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   const db = loadDB();
 
   try {
-    // ===============================
+
+    // validação geral
+    const valid = await validateInteraction(interaction);
+    if (!valid) return;
+
+    // ========================================
     // 📊 /WARNSTATS
-    // ===============================
+    // ========================================
     if (interaction.commandName === 'warnstats') {
+
       const target = interaction.options.getUser('usuario') || interaction.user;
       const userData = db[target.id] || { warns: [] };
 
+      // sem warns
       if (!userData.warns.length) {
-        const embed = new EmbedBuilder()
+        const embed = createBaseEmbed()
           .setColor(COLORS.SUCCESS)
           .setTitle('✅ Usuário Limpo')
           .setDescription(`${target} não possui warns.`)
-          .setThumbnail(target.displayAvatarURL())
-          .setTimestamp();
+          .setThumbnail(target.displayAvatarURL({ dynamic: true }));
 
         return interaction.reply({
           embeds: [embed],
@@ -268,17 +464,16 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      const embed = new EmbedBuilder()
-        .setColor(getColorByWarns(userData.warns.length))
+      // com warns
+      const embed = createBaseEmbed()
+        .setColor(getWarnColor(userData.warns.length))
         .setTitle('📊 Estatísticas de Warn')
-        .setThumbnail(target.displayAvatarURL())
+        .setThumbnail(target.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: '👤 Usuário', value: `${target}`, inline: true },
           { name: '⚠️ Warns Ativos', value: `${userData.warns.length}`, inline: true },
-          { name: '📄 Lista', value: formatWarnList(userData.warns) }
-        )
-        .setFooter({ text: 'Sistema de Moderação' })
-        .setTimestamp();
+          { name: '📄 Últimos Warns', value: formatWarnList(userData.warns) }
+        );
 
       return interaction.reply({
         embeds: [embed],
@@ -286,16 +481,15 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    // ===============================
+    // ========================================
     // ➕ /ADDWARN
-    // ===============================
+    // ========================================
     if (interaction.commandName === 'addwarn') {
-      const member = interaction.member;
 
-      if (!isStaff(member)) {
+      if (!(await isStaff(interaction))) {
         logger.perm(`${interaction.user.tag} tentou usar /addwarn`);
         return interaction.reply({
-          content: '❌ Você não tem permissão.',
+          embeds: [noPermEmbed()],
           ephemeral: true
         });
       }
@@ -303,87 +497,67 @@ client.on('interactionCreate', async (interaction) => {
       const target = interaction.options.getUser('usuario');
       const reason = interaction.options.getString('motivo');
 
-      if (target.bot) {
-        return interaction.reply({
-          content: '❌ Não é possível warnar bots.',
-          ephemeral: true
-        });
-      }
+      const member = await interaction.guild.members.fetch(target.id);
 
-      const guildMember = await interaction.guild.members.fetch(target.id);
-
-      if (!db[target.id]) db[target.id] = { warns: [] };
+      ensureUser(db, target.id);
 
       const warnID = generateWarnID();
 
+      // adicionar warn
       db[target.id].warns.push({
         id: warnID,
         reason,
         date: new Date().toISOString()
       });
 
-      const warnCount = db[target.id].warns.length;
+      let warnCount = db[target.id].warns.length;
+      warnCount = safeCount(warnCount);
 
       saveDB(db);
 
-      // ===============================
-      // 🎭 CARGOS
-      // ===============================
-      await updateRoles(guildMember, warnCount);
+      // atualizar cargos
+      await updateWarnRoles(member, warnCount);
 
-      // ===============================
-      // 📩 DM (2 WARNS)
-      // ===============================
+      // ========================================
+      // 📩 PUNIÇÃO 2 WARNS
+      // ========================================
       if (warnCount === 2) {
-        try {
-          await target.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(COLORS.WARNING2)
-                .setTitle('⚠️ Aviso Importante')
-                .setDescription('Você recebeu 2 warns.')
-                .addFields({ name: 'Motivo', value: reason })
-                .setTimestamp()
-            ]
-          });
-        } catch {
-          logger.warn('Falha ao enviar DM.');
-        }
+        await safeDM(target,
+          createBaseEmbed()
+            .setColor(COLORS.WARN2)
+            .setTitle('⚠️ Aviso Importante')
+            .setDescription('Você atingiu **2 warns**.')
+            .addFields({ name: 'Motivo', value: reason })
+        );
       }
 
-      // ===============================
-      // 👢 KICK (3 WARNS)
-      // ===============================
+      // ========================================
+      // 👢 PUNIÇÃO 3 WARNS
+      // ========================================
       if (warnCount >= 3) {
-        try {
-          await guildMember.kick('3 warns atingidos');
-        } catch (err) {
-          logger.error(`Erro ao kickar: ${err.message}`);
-        }
+        await safeKick(member, '3 warns atingidos');
       }
 
-      // ===============================
-      // 📦 EMBED
-      // ===============================
-      const embed = new EmbedBuilder()
-        .setColor(getColorByWarns(warnCount))
+      // ========================================
+      // 📦 EMBED RESPOSTA
+      // ========================================
+      const embed = createBaseEmbed()
+        .setColor(getWarnColor(warnCount))
         .setTitle('⚠️ Warn Aplicado')
         .addFields(
           { name: '👤 Usuário', value: `${target}` },
           { name: '📄 Motivo', value: reason },
           { name: '⚠️ Warns Ativos', value: `${warnCount}` },
           { name: '🆔 ID', value: warnID }
-        )
-        .setFooter({ text: `Aplicado por ${interaction.user.tag}` })
-        .setTimestamp();
+        );
 
       await interaction.reply({ embeds: [embed] });
 
-      // ===============================
-      // 🧾 LOG
-      // ===============================
-      const logEmbed = new EmbedBuilder()
-        .setColor(getColorByWarns(warnCount))
+      // ========================================
+      // 📜 LOG
+      // ========================================
+      const logEmbed = createBaseEmbed()
+        .setColor(getWarnColor(warnCount))
         .setTitle('📜 Log de Moderação')
         .addFields(
           { name: 'Usuário', value: `${target}` },
@@ -391,24 +565,22 @@ client.on('interactionCreate', async (interaction) => {
           { name: 'Ação', value: 'Add Warn' },
           { name: 'Warns', value: `${warnCount}` },
           { name: 'ID', value: warnID }
-        )
-        .setTimestamp();
+        );
 
       await sendLog(interaction.guild, logEmbed);
 
       logger.success(`Warn aplicado em ${target.tag}`);
     }
 
-    // ===============================
+    // ========================================
     // ➖ /REMOVEWARN
-    // ===============================
+    // ========================================
     if (interaction.commandName === 'removewarn') {
-      const member = interaction.member;
 
-      if (!isStaff(member)) {
+      if (!(await isStaff(interaction))) {
         logger.perm(`${interaction.user.tag} tentou usar /removewarn`);
         return interaction.reply({
-          content: '❌ Sem permissão.',
+          embeds: [noPermEmbed()],
           ephemeral: true
         });
       }
@@ -417,33 +589,41 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!db[target.id] || db[target.id].warns.length === 0) {
         return interaction.reply({
-          content: '❌ Usuário não possui warns.',
+          embeds: [errorEmbed('Este usuário não possui warns.')],
           ephemeral: true
         });
       }
 
-      const removed = db[target.id].warns.pop();
-      const warnCount = db[target.id].warns.length;
+      const member = await interaction.guild.members.fetch(target.id);
+
+      const removedWarn = db[target.id].warns.pop();
+
+      let warnCount = db[target.id].warns.length;
+      warnCount = safeCount(warnCount);
 
       saveDB(db);
 
-      const guildMember = await interaction.guild.members.fetch(target.id);
+      // atualizar cargos
+      await updateWarnRoles(member, warnCount);
 
-      await updateRoles(guildMember, warnCount);
-
-      const embed = new EmbedBuilder()
-        .setColor(getColorByWarns(warnCount))
+      // ========================================
+      // 📦 EMBED RESPOSTA
+      // ========================================
+      const embed = createBaseEmbed()
+        .setColor(getWarnColor(warnCount))
         .setTitle('✅ Warn Removido')
         .addFields(
           { name: '👤 Usuário', value: `${target}` },
-          { name: '⚠️ Warns Atuais', value: `${warnCount}` },
-          { name: '🆔 ID Removido', value: removed.id }
-        )
-        .setTimestamp();
+          { name: '⚠️ Warns Restantes', value: `${warnCount}` },
+          { name: '🆔 ID Removido', value: removedWarn.id }
+        );
 
       await interaction.reply({ embeds: [embed] });
 
-      const logEmbed = new EmbedBuilder()
+      // ========================================
+      // 📜 LOG
+      // ========================================
+      const logEmbed = createBaseEmbed()
         .setColor(COLORS.SUCCESS)
         .setTitle('📜 Log de Moderação')
         .addFields(
@@ -451,9 +631,8 @@ client.on('interactionCreate', async (interaction) => {
           { name: 'Staff', value: `${interaction.user}` },
           { name: 'Ação', value: 'Remove Warn' },
           { name: 'Warns', value: `${warnCount}` },
-          { name: 'ID', value: removed.id }
-        )
-        .setTimestamp();
+          { name: 'ID', value: removedWarn.id }
+        );
 
       await sendLog(interaction.guild, logEmbed);
 
@@ -465,202 +644,68 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
       await interaction.reply({
-        content: '❌ Ocorreu um erro.',
+        embeds: [errorEmbed('Ocorreu um erro inesperado.')],
         ephemeral: true
       });
     } catch {}
   }
 });
+// ========================================
+// 🔄 SINCRONIZAÇÃO (CARGOS → DB)
+// ========================================
+// Resolve o problema:
+// "usuário tem cargo mas não aparece warn"
 
-// ===============================
-// 🛡️ VALIDAÇÕES AVANÇADAS
-// ===============================
-
-// Verifica permissões do bot
-function checkBotPermissions(guild, member) {
-  const botMember = guild.members.me;
-
-  const neededPerms = [
-    PermissionsBitField.Flags.ManageRoles,
-    PermissionsBitField.Flags.KickMembers,
-    PermissionsBitField.Flags.SendMessages,
-    PermissionsBitField.Flags.EmbedLinks
-  ];
-
-  const missing = neededPerms.filter(perm => !botMember.permissions.has(perm));
-
-  if (missing.length > 0) {
-    logger.perm(`Permissões faltando: ${missing.join(', ')}`);
-    return false;
-  }
-
-  return true;
-}
-
-// ===============================
-// 🚫 PROTEÇÃO CONTRA ERROS COMUNS
-// ===============================
-
-// Evitar warn em si mesmo
-function isSelfWarn(interaction, target) {
-  if (interaction.user.id === target.id) {
-    return true;
-  }
-  return false;
-}
-
-// Evitar warns negativos
-function safeWarnCount(count) {
-  if (count < 0) return 0;
-  return count;
-}
-
-// ===============================
-// 🔄 LIMPEZA TOTAL DE CARGOS
-// ===============================
-async function clearAllWarnRoles(member) {
+async function syncRolesToDatabase() {
   try {
-    const roles = [
-      process.env.WARN_1,
-      process.env.WARN_2,
-      process.env.WARN_3
-    ];
+    logger.info('Iniciando sincronização de cargos...');
 
-    await member.roles.remove(roles).catch(() => {});
-  } catch (err) {
-    logger.error(`Erro ao limpar cargos: ${err.message}`);
-  }
-}
+    const db = loadDB();
 
-// ===============================
-// 📩 DM SEGURA
-// ===============================
-async function safeDM(user, embed) {
-  try {
-    await user.send({ embeds: [embed] });
-    return true;
-  } catch (err) {
-    logger.warn(`Falha DM (${user.tag})`);
-    return false;
-  }
-}
+    for (const guild of client.guilds.cache.values()) {
+      const members = await guild.members.fetch();
 
-// ===============================
-// 👢 KICK SEGURO
-// ===============================
-async function safeKick(member, reason) {
-  try {
-    if (!member.kickable) {
-      logger.error(`Não é possível kickar ${member.user.tag}`);
-      return false;
-    }
+      members.forEach(member => {
+        let count = 0;
 
-    await member.kick(reason);
-    logger.success(`Usuário kickado: ${member.user.tag}`);
-    return true;
-  } catch (err) {
-    logger.error(`Erro ao kickar: ${err.message}`);
-    return false;
-  }
-}
+        if (member.roles.cache.has(process.env.WARN_1)) count = 1;
+        if (member.roles.cache.has(process.env.WARN_2)) count = 2;
+        if (member.roles.cache.has(process.env.WARN_3)) count = 3;
 
-// ===============================
-// 🎨 EMBED DE ERRO PADRÃO
-// ===============================
-function errorEmbed(message) {
-  return new EmbedBuilder()
-    .setColor(COLORS.ERROR)
-    .setTitle('❌ Erro')
-    .setDescription(message)
-    .setTimestamp();
-}
-
-// ===============================
-// 🎨 EMBED PERMISSÃO
-// ===============================
-function permEmbed() {
-  return new EmbedBuilder()
-    .setColor(COLORS.ERROR)
-    .setTitle('🚫 Sem Permissão')
-    .setDescription('Você não possui permissão para usar este comando.')
-    .setTimestamp();
-}
-
-// ===============================
-// 🔧 MELHORIA NO UPDATE ROLES (SAFE)
-// ===============================
-async function updateRolesSafe(member, warnCount) {
-  try {
-    warnCount = safeWarnCount(warnCount);
-
-    await clearAllWarnRoles(member);
-
-    if (warnCount === 1) {
-      await member.roles.add(process.env.WARN_1);
-    }
-
-    if (warnCount === 2) {
-      await member.roles.add(process.env.WARN_2);
-    }
-
-    if (warnCount >= 3) {
-      if (process.env.WARN_3) {
-        await member.roles.add(process.env.WARN_3);
-      }
-    }
-
-  } catch (err) {
-    logger.error(`Erro crítico cargos: ${err.message}`);
-  }
-}
-
-// ===============================
-// 🔁 SOBRESCREVER FUNÇÕES ANTIGAS
-// ===============================
-global.updateRoles = updateRolesSafe;
-
-// ===============================
-// 🧠 MELHORIAS FINAIS DO SISTEMA
-// ===============================
-
-// Hook para validar tudo antes dos comandos
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  try {
-    if (!checkBotPermissions(interaction.guild, interaction.member)) {
-      return interaction.reply({
-        embeds: [errorEmbed('O bot não possui permissões suficientes.')],
-        ephemeral: true
+        if (count > 0) {
+          db[member.id] = {
+            warns: Array.from({ length: count }).map((_, i) => ({
+              id: generateWarnID(),
+              reason: 'Sincronizado automaticamente',
+              date: new Date().toISOString()
+            }))
+          };
+        }
       });
     }
 
-    const target = interaction.options.getUser('usuario');
+    saveDB(db);
 
-    if (target) {
-      if (target.bot) {
-        return interaction.reply({
-          embeds: [errorEmbed('Não é possível usar comandos em bots.')],
-          ephemeral: true
-        });
-      }
-
-      if (isSelfWarn(interaction, target)) {
-        return interaction.reply({
-          embeds: [errorEmbed('Você não pode fazer isso em si mesmo.')],
-          ephemeral: true
-        });
-      }
-    }
-
+    logger.success('Sincronização concluída.');
   } catch (err) {
-    logger.error(`Erro pré-validação: ${err.message}`);
+    logger.error(`Erro na sync: ${err.message}`);
+  }
+}
+
+// ========================================
+// 🧠 AUTO-SYNC AO INICIAR
+// ========================================
+client.once('ready', async () => {
+  try {
+    await syncRolesToDatabase();
+  } catch (err) {
+    logger.warn('Falha ao sincronizar na inicialização.');
   }
 });
 
-// ===============================
-// 📦 TRATAMENTO GLOBAL DE ERROS
-// ===============================
+// ========================================
+// ⚠️ TRATAMENTO GLOBAL DE ERROS
+// ========================================
 process.on('unhandledRejection', (reason) => {
   logger.error(`Unhandled Rejection: ${reason}`);
 });
@@ -669,14 +714,34 @@ process.on('uncaughtException', (err) => {
   logger.error(`Uncaught Exception: ${err.message}`);
 });
 
-// ===============================
-// 🔌 LOGIN
-// ===============================
+// ========================================
+// 🔄 PROTEÇÃO DE DB CORROMPIDO
+// ========================================
+function safeLoadDB() {
+  try {
+    return loadDB();
+  } catch {
+    logger.warn('DB corrompido, resetando...');
+    saveDB({});
+    return {};
+  }
+}
+
+// ========================================
+// 📊 MONITORAMENTO SIMPLES
+// ========================================
+setInterval(() => {
+  logger.info(`Servidores: ${client.guilds.cache.size}`);
+}, 1000 * 60 * 5); // a cada 5 min
+
+// ========================================
+// 🚀 LOGIN
+// ========================================
 client.login(process.env.TOKEN)
   .then(() => logger.success('Login realizado com sucesso.'))
   .catch(err => logger.error(`Erro ao logar: ${err.message}`));
 
-// ===============================
+// ========================================
 // 🏁 FINALIZAÇÃO
-// ===============================
-logger.info('Sistema de moderação carregado.');
+// ========================================
+logger.info('Sistema de moderação iniciado com sucesso.');
