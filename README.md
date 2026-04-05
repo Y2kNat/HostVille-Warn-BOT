@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.sanishtech.com/u/c788a601e91b29055a60cbcf765469bf.png" alt="Warn Bot Banner" width="100%">
+  <img src="https://cdn.discordapp.com/attachments/1481730240236752906/1490186146557202542/2caafef3b98fb7ca780403088149bce9.png?ex=69d3237f&is=69d1d1ff&hm=325cab5741420b06e38c8860feac3aa9699d1a89271f44e94d68998535a63f5a&" alt="Warn Bot Banner" width="100%">
 </p>
 
 <p align="center">
