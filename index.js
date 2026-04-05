@@ -644,21 +644,38 @@ class PunishmentManager {
 
     async banMember(member, reason, warnCount) {
         try {
+            console.log(chalk.bgRed.white('[BAN DEBUG]') + chalk.yellow(` Iniciando ban para ${member.user.tag}`));
+            
+            // Verificar permissões em tempo real
+            const botMember = await member.guild.members.fetch(this.client.user.id);
+            const hasBanPerm = botMember.permissions.has(PermissionsBitField.Flags.BanMembers);
+            
+            console.log(chalk.yellow(`[BAN DEBUG] Permissão de banir: ${hasBanPerm}`));
+            console.log(chalk.yellow(`[BAN DEBUG] Member bannable: ${member.bannable}`));
+            console.log(chalk.yellow(`[BAN DEBUG] Bot role highest: ${botMember.roles.highest.name}`));
+            console.log(chalk.yellow(`[BAN DEBUG] Member role highest: ${member.roles.highest.name}`));
+            
             if (!member.bannable) {
-                return { success: false, error: 'Bot não pode banir este usuário (cargo mais alto ou sem permissão)' };
+                const errorMsg = `Bot não pode banir - cargo do bot (${botMember.roles.highest.name}) é mais baixo que o cargo do membro (${member.roles.highest.name})`;
+                console.log(chalk.red(`[BAN DEBUG] ${errorMsg}`));
+                return { success: false, error: errorMsg };
             }
             
-            if (!botPermissions.hasBanMembers) {
+            if (!hasBanPerm) {
+                console.log(chalk.red(`[BAN DEBUG] Bot não tem permissão BanMembers`));
                 return { success: false, error: 'Bot sem permissão BanMembers' };
             }
             
             const banReason = `Acumulou ${warnCount}/3 warns - Motivo: ${reason}`;
+            console.log(chalk.yellow(`[BAN DEBUG] Executando ban com motivo: ${banReason}`));
+            
             await member.ban({ reason: banReason });
             
-            console.log(chalk.red(`✗ Usuário banido: ${member.user.tag}`));
+            console.log(chalk.bgGreen.white('[BAN DEBUG]') + chalk.green(` BANIDO COM SUCESSO: ${member.user.tag}`));
             return { success: true };
         } catch (error) {
-            console.log(chalk.red(`✗ Erro ao banir: ${error.message}`));
+            console.log(chalk.bgRed.white('[BAN DEBUG]') + chalk.red(` Erro: ${error.message}`));
+            console.log(chalk.gray(error.stack));
             return { success: false, error: error.message };
         }
     }
@@ -687,17 +704,26 @@ class PunishmentManager {
             }
             
             if (warnCount >= 3) {
+                console.log(chalk.bgRed.white('[DEBUG]') + chalk.red(' Entrou no if do ban!'));
+                console.log(chalk.yellow(`[DEBUG] Member: ${member.user.tag}`));
+                console.log(chalk.yellow(`[DEBUG] Member bannable: ${member.bannable}`));
+                
                 const banResult = await this.banMember(member, lastWarnReason, warnCount);
+                
+                console.log(chalk.yellow(`[DEBUG] Resultado do ban: ${JSON.stringify(banResult)}`));
+                
                 if (banResult.success) {
                     results.banned = true;
+                    console.log(chalk.bgGreen.white('[DEBUG]') + chalk.green(' Ban executado com sucesso!'));
                 } else {
                     results.errors.push(`Erro ao banir: ${banResult.error}`);
+                    console.log(chalk.bgRed.white('[DEBUG]') + chalk.red(` Falha no ban: ${banResult.error}`));
                 }
             }
             
             return results;
         } catch (error) {
-            console.log(chalk.red(`✗ Erro no processamento de punições: ${error.message}`));
+            console.log(chalk.bgRed.white('[DEBUG]') + chalk.red(` Erro no processamento: ${error.message}`));
             return { errors: [error.message] };
         }
     }
@@ -1192,7 +1218,7 @@ async function handleAddWarn(interaction) {
             embedColor = '#E74C3C';
             embedTitle = `${EMOJIS.EMOJI_40} LIMITE MÁXIMO ATINGIDO - BANIMENTO`;
             embedDescription = `**${targetUser.tag}** atingiu o limite de 3 advertências`;
-            actionMessage = '• Usuário BANIDO do servidor';
+            actionMessage = punishmentResults.banned ? '• Usuário BANIDO do servidor' : '• FALHA NO BANIMENTO - Verificar permissões do bot';
         }
 
         const responseEmbed = new EmbedBuilder()
@@ -1409,7 +1435,7 @@ setInterval(() => {
     console.log(chalk.gray('[Cache] Limpeza automática executada'));
 }, 30 * 60 * 1000); // 30 minutos
 
-client.once('clientReady', async () => {
+client.once('ready', async () => {
     console.log(chalk.green(`\n✓ Bot online: ${client.user.tag}`));
     console.log(chalk.gray(`✓ Servidores: ${client.guilds.cache.size}`));
     
@@ -1467,13 +1493,13 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ============================================
-// BACKUP AUTOMÁTICO
+// BACKUP AUTOMÁTICO - 8 HORAS
 // ============================================
 
 setInterval(() => {
     saveWarnsDatabase();
-    console.log(chalk.gray('[Backup] Banco de dados salvo automaticamente'));
-}, 2800000);
+    console.log(chalk.gray('[Backup] Banco de dados salvo automaticamente (8 horas)'));
+}, 28800000); // 8 horas em milissegundos
 
 // ============================================
 // TRATAMENTO DE SINAIS DO SISTEMA
@@ -1519,3 +1545,7 @@ client.login(TOKEN).catch(async error => {
     await errorHandler.handleError(error, { type: 'login' });
     process.exit(1);
 });
+
+// ============================================
+// FIM DO CÓDIGO
+// ============================================
