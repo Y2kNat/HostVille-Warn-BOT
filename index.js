@@ -1409,7 +1409,7 @@ setInterval(() => {
     console.log(chalk.gray('[Cache] Limpeza automática executada'));
 }, 30 * 60 * 1000); // 30 minutos
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(chalk.green(`\n✓ Bot online: ${client.user.tag}`));
     console.log(chalk.gray(`✓ Servidores: ${client.guilds.cache.size}`));
     
@@ -1473,7 +1473,7 @@ client.on('guildMemberAdd', async (member) => {
 setInterval(() => {
     saveWarnsDatabase();
     console.log(chalk.gray('[Backup] Banco de dados salvo automaticamente'));
-}, 300000);
+}, 2800000);
 
 // ============================================
 // TRATAMENTO DE SINAIS DO SISTEMA
@@ -1519,7 +1519,3 @@ client.login(TOKEN).catch(async error => {
     await errorHandler.handleError(error, { type: 'login' });
     process.exit(1);
 });
-
-// ============================================
-// FIM DO CÓDIGO
-// ============================================
