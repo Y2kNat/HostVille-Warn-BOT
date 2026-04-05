@@ -1203,7 +1203,7 @@ client.once('ready', async () => {
             name: `𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝`,
             type: 1
         }],
-        status: 'idle'
+        status: 'online'
     });
     
     console.log(chalk.green('✓ Bot pronto!\n'));
