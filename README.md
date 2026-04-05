@@ -3,12 +3,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-5.0.1-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/node-16.9%2B-green.svg" alt="Node.js">
-  <img src="img.shields.io/badge/discord.js-v14.14.1-blue.svg" alt="Discord.js">
-  <img src="img.shields.io/badge/license-MIT-green.svg" alt="License">
-  <img src="img.shields.io/badge/status-online-brightgreen.svg" alt="Status">
-  <img src="img.shields.io/badge/warns%20system-complete-orange.svg" alt="Warn System">
+  <img src="https://img.shields.io/badge/discord.js-v14.14.0-blue.svg" alt="Discord.js">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/status-online-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/warns%20system-v2.0.0-orange.svg" alt="Warns System">
 </p>
 
 # 🛡️ Warn System Bot - Sistema Completo de Moderação
