@@ -1,7 +1,7 @@
 // ============================================
 // DISCORD WARN BOT - SISTEMA COMPLETO DE MODERAÇÃO
 // discord.js v14.14.1
-// COM REMOVEWARN SIMPLIFICADO (REMOVE ÚLTIMO WARN)
+// COM LOGS SIMPLIFICADOS
 // ============================================
 
 require('dotenv').config();
@@ -53,7 +53,7 @@ if (!TOKEN || !CLIENT_ID) {
 }
 
 if (!GUILD_ID) {
-    console.log(chalk.bgYellow.black('[AVISO]') + chalk.yellow(' GUILD_ID não configurado. Recomendado para funcionamento correto.'));
+    console.log(chalk.bgYellow.black('[AVISO]') + chalk.yellow(' GUILD_ID não configurado.'));
 }
 
 // Arquivo de armazenamento de warns
@@ -74,21 +74,18 @@ function loadWarnsDatabase() {
             const data = fs.readFileSync(WARNS_FILE, 'utf8');
             const parsed = JSON.parse(data);
             warnsDatabase = new Map(Object.entries(parsed));
-            console.log(chalk.cyan(`${EMOJIS.EMOJI_43}[SISTEMA]`) + chalk.green(` Banco de warns carregado: ${warnsDatabase.size} usuários`));
-            
             let totalWarns = 0;
             for (const warns of warnsDatabase.values()) {
                 totalWarns += warns.length;
             }
-            console.log(chalk.cyan(`${EMOJIS.EMOJI_42}[SISTEMA]`) + chalk.gray(` Total de warns registrados: ${totalWarns}`));
+            console.log(chalk.green(`✓ Banco de warns carregado: ${warnsDatabase.size} usuários, ${totalWarns} warns`));
         } else {
             warnsDatabase = new Map();
             saveWarnsDatabase();
-            console.log(chalk.cyan(`${EMOJIS.EMOJI_43}[SISTEMA]`) + chalk.yellow(' Novo banco de warns criado'));
+            console.log(chalk.yellow('✓ Novo banco de warns criado'));
         }
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO CRÍTICO]`) + chalk.red(` Falha ao carregar banco de dados: ${error.message}`));
-        console.log(chalk.gray(error.stack));
+        console.log(chalk.red(`✗ Erro ao carregar banco: ${error.message}`));
         warnsDatabase = new Map();
     }
 }
@@ -97,9 +94,8 @@ function saveWarnsDatabase() {
     try {
         const object = Object.fromEntries(warnsDatabase);
         fs.writeFileSync(WARNS_FILE, JSON.stringify(object, null, 2));
-        console.log(chalk.gray(`${EMOJIS.GIT}[BACKUP] Banco de dados salvo - ${new Date().toLocaleTimeString()}`));
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` Falha ao salvar banco de dados: ${error.message}`));
+        console.log(chalk.red(`✗ Erro ao salvar banco: ${error.message}`));
     }
 }
 
@@ -152,7 +148,7 @@ async function getStaffRoleName(client) {
     
     try {
         if (!GUILD_ID || GUILD_ID === 'seu_guild_id_aqui') {
-            return 'Cargo Staff (configure GUILD_ID)';
+            return 'Cargo Staff';
         }
         
         const guild = await client.guilds.fetch(GUILD_ID);
@@ -166,9 +162,8 @@ async function getStaffRoleName(client) {
             }
         }
         
-        return 'Cargo Staff (não encontrado)';
+        return 'Cargo Staff';
     } catch (error) {
-        console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Buscar nome do cargo: ${error.message}`));
         return 'Cargo Staff';
     }
 }
@@ -191,7 +186,6 @@ class WarnManager {
             }
             return warnsDatabase.get(userId);
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` getUserWarns falhou: ${error.message}`));
             return [];
         }
     }
@@ -199,7 +193,7 @@ class WarnManager {
     async addWarn(userId, reason, staffId, staffName) {
         try {
             if (!userId || !reason) {
-                throw new Error('Dados incompletos para adicionar warn');
+                throw new Error('Dados incompletos');
             }
 
             if (!warnsDatabase.has(userId)) {
@@ -223,7 +217,7 @@ class WarnManager {
             warnsDatabase.set(userId, currentWarns);
             saveWarnsDatabase();
 
-            console.log(chalk.green(`${EMOJIS.EMOJI_43}[ADDWARN] ${chalk.bold(warnId)} adicionado ao usuário ${userId} por ${staffName}`));
+            console.log(chalk.green(`✓ Warn adicionado: ${userId} - Total: ${currentWarns.length}/3`));
             
             return {
                 success: true,
@@ -232,8 +226,7 @@ class WarnManager {
                 warnId: warnId
             };
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` addWarn falhou: ${error.message}`));
-            console.log(chalk.gray(error.stack));
+            console.log(chalk.red(`✗ Erro ao adicionar warn: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -241,14 +234,14 @@ class WarnManager {
     async removeWarn(userId, warnId, staffId, staffName) {
         try {
             if (!warnsDatabase.has(userId)) {
-                return { success: false, error: 'Usuário não possui nenhum warn registrado' };
+                return { success: false, error: 'Usuário não possui warns' };
             }
 
             const currentWarns = warnsDatabase.get(userId);
             const warnIndex = currentWarns.findIndex(w => w.id === warnId);
             
             if (warnIndex === -1) {
-                return { success: false, error: `Warn com ID ${warnId} não encontrado para este usuário` };
+                return { success: false, error: 'Warn não encontrado' };
             }
 
             const removedWarn = currentWarns.splice(warnIndex, 1)[0];
@@ -260,7 +253,7 @@ class WarnManager {
             warnsDatabase.set(userId, currentWarns);
             saveWarnsDatabase();
 
-            console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[REMOVEWARN] ${chalk.bold(warnId)} removido do usuário ${userId} por ${staffName}`));
+            console.log(chalk.yellow(`✓ Warn removido: ${userId} - Agora: ${currentWarns.length}/3`));
             
             return {
                 success: true,
@@ -268,8 +261,7 @@ class WarnManager {
                 totalWarns: currentWarns.length
             };
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` removeWarn falhou: ${error.message}`));
-            console.log(chalk.gray(error.stack));
+            console.log(chalk.red(`✗ Erro ao remover warn: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -279,7 +271,6 @@ class WarnManager {
             if (!warnsDatabase.has(userId)) return 0;
             return warnsDatabase.get(userId).length;
         } catch (error) {
-            console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] getWarnCount: ${error.message}`));
             return 0;
         }
     }
@@ -301,7 +292,6 @@ class WarnManager {
             }
             return formattedList;
         } catch (error) {
-            console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] getAllWarnsFormatted: ${error.message}`));
             return null;
         }
     }
@@ -332,27 +322,22 @@ class PunishmentManager {
             if (!botPermissions.hasKickMembers) missingPerms.push('KickMembers');
             
             if (missingPerms.length > 0) {
-                console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO]`) + chalk.yellow(` Bot sem permissões: ${missingPerms.join(', ')}`));
+                console.log(chalk.yellow(`⚠ Bot sem permissões: ${missingPerms.join(', ')}`));
                 return false;
             }
             
             return true;
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` checkBotPermissions falhou: ${error.message}`));
             return false;
         }
     }
 
     async removeAllWarnRoles(member) {
         try {
-            let removedCount = 0;
-            
             if (WARN_1 && WARN_1 !== 'id_do_cargo_warn_1') {
                 const role = await member.guild.roles.fetch(WARN_1).catch(() => null);
                 if (role && member.roles.cache.has(WARN_1)) {
                     await member.roles.remove(role);
-                    removedCount++;
-                    console.log(chalk.gray(`${EMOJIS.GIT}[CARGOS] Cargo ${role.name} removido de ${member.user.tag}`));
                 }
             }
             
@@ -360,8 +345,6 @@ class PunishmentManager {
                 const role = await member.guild.roles.fetch(WARN_2).catch(() => null);
                 if (role && member.roles.cache.has(WARN_2)) {
                     await member.roles.remove(role);
-                    removedCount++;
-                    console.log(chalk.gray(`${EMOJIS.GIT}[CARGOS] Cargo ${role.name} removido de ${member.user.tag}`));
                 }
             }
             
@@ -369,14 +352,11 @@ class PunishmentManager {
                 const role = await member.guild.roles.fetch(WARN_3).catch(() => null);
                 if (role && member.roles.cache.has(WARN_3)) {
                     await member.roles.remove(role);
-                    removedCount++;
-                    console.log(chalk.gray(`${EMOJIS.GIT}[CARGOS] Cargo ${role.name} removido de ${member.user.tag}`));
                 }
             }
             
-            return { success: true, removedCount };
+            return { success: true };
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` removeAllWarnRoles falhou: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -388,7 +368,7 @@ class PunishmentManager {
             await this.removeAllWarnRoles(member);
             
             if (warnCount === 0) {
-                console.log(chalk.green(`${EMOJIS.EMOJI_43}[CARGOS] ${member.user.tag} - Todos os cargos de warn removidos (0 warns)`));
+                console.log(chalk.green(`✓ Cargos removidos: ${member.user.tag}`));
                 return { success: true, action: 'all_removed' };
             }
             
@@ -410,21 +390,17 @@ class PunishmentManager {
                 const role = await member.guild.roles.fetch(roleId).catch(() => null);
                 if (role) {
                     if (!botPermissions.hasManageRoles) {
-                        console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO]`) + chalk.yellow(` Bot sem permissão ManageRoles para aplicar ${roleName}`));
                         return { success: false, error: 'Bot sem permissão ManageRoles' };
                     }
                     
                     await member.roles.add(role);
-                    console.log(chalk.green(`${EMOJIS.EMOJI_43}[CARGOS] ${member.user.tag} - Cargo ${roleName} aplicado (${warnCount} warns)`));
+                    console.log(chalk.green(`✓ Cargo aplicado: ${member.user.tag} - ${roleName}`));
                     return { success: true, action: 'role_applied', roleName };
-                } else {
-                    console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[AVISO] Cargo ${roleName} (${roleId}) não encontrado no servidor`));
                 }
             }
             
             return { success: true, action: 'no_role_needed' };
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` applyWarnRole falhou: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -466,14 +442,13 @@ class PunishmentManager {
             }
             
             await member.send({ embeds: [dmEmbed] });
-            console.log(chalk.green(`${EMOJIS.EMOJI_43}[DM] Mensagem enviada para ${member.user.tag} (${warnCount} warns)`));
+            console.log(chalk.blue(`✓ DM enviada para ${member.user.tag}`));
             return { success: true };
         } catch (error) {
             if (error.code === 50007) {
-                console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[DM] Falha ao enviar DM para ${member.user.tag}: Usuário com DMs bloqueadas`));
-                return { success: false, error: 'DM bloqueada pelo usuário' };
+                console.log(chalk.yellow(`⚠ DM bloqueada: ${member.user.tag}`));
+                return { success: false, error: 'DM bloqueada' };
             }
-            console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[DM] Falha ao enviar DM: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -481,22 +456,19 @@ class PunishmentManager {
     async kickMember(member, reason, warnCount) {
         try {
             if (!member.kickable) {
-                console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO]`) + chalk.yellow(` Bot não pode kickar ${member.user.tag}`));
-                return { success: false, error: 'Bot não tem permissão para kickar este usuário' };
+                return { success: false, error: 'Bot não pode kickar' };
             }
             
             if (!botPermissions.hasKickMembers) {
-                console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO]`) + chalk.yellow(' Bot sem permissão KickMembers'));
                 return { success: false, error: 'Bot sem permissão KickMembers' };
             }
             
-            const kickReason = `Acumulou ${warnCount}/3 warns - Limite máximo atingido | Motivo do último warn: ${reason}`;
+            const kickReason = `Acumulou ${warnCount}/3 warns - Motivo: ${reason}`;
             await member.kick(kickReason);
             
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[KICK]`) + chalk.red(` ${member.user.tag} foi expulso do servidor (${warnCount} warns)`));
+            console.log(chalk.red(`✗ Usuário expulso: ${member.user.tag}`));
             return { success: true };
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` kickMember falhou: ${error.message}`));
             return { success: false, error: error.message };
         }
     }
@@ -521,8 +493,6 @@ class PunishmentManager {
                 const dmResult = await this.sendWarningDM(member, warnCount, lastWarnReason, lastWarnId);
                 if (dmResult.success) {
                     results.dmSent = true;
-                } else {
-                    results.errors.push(`Erro na DM: ${dmResult.error}`);
                 }
             }
             
@@ -530,14 +500,11 @@ class PunishmentManager {
                 const kickResult = await this.kickMember(member, lastWarnReason, warnCount);
                 if (kickResult.success) {
                     results.kicked = true;
-                } else {
-                    results.errors.push(`Erro no kick: ${kickResult.error}`);
                 }
             }
             
             return results;
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` processPunishments falhou: ${error.message}`));
             return { errors: [error.message] };
         }
     }
@@ -556,14 +523,12 @@ class LogManager {
     async sendModerationLog(user, staff, action, details) {
         try {
             if (!LOG_CHANNEL_ID || LOG_CHANNEL_ID === 'id_do_canal_de_logs') {
-                console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[LOG] Canal de logs não configurado`));
-                return { success: false, error: 'Canal de logs não configurado' };
+                return { success: false };
             }
 
             const logChannel = await this.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
             if (!logChannel) {
-                console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[LOG] Canal ${LOG_CHANNEL_ID} não encontrado`));
-                return { success: false, error: 'Canal de logs não encontrado' };
+                return { success: false };
             }
 
             let embedColor;
@@ -574,7 +539,7 @@ class LogManager {
                 case 'ADDWARN':
                     embedColor = details.warnCount === 1 ? '#F1C40F' : (details.warnCount === 2 ? '#E67E22' : '#E74C3C');
                     embedTitle = `${EMOJIS.EMOJI_41} ADIÇÃO DE ADVERTÊNCIA`;
-                    embedDescription = `Uma nova advertência foi registrada no sistema`;
+                    embedDescription = `Uma nova advertência foi registrada`;
                     break;
                 case 'REMOVEWARN':
                     embedColor = '#2ECC71';
@@ -584,12 +549,12 @@ class LogManager {
                 case 'KICK':
                     embedColor = '#E74C3C';
                     embedTitle = `${EMOJIS.EMOJI_40} EXPULSÃO AUTOMÁTICA`;
-                    embedDescription = `Um usuário foi expulso por atingir o limite de warns`;
+                    embedDescription = `Um usuário foi expulso`;
                     break;
                 default:
                     embedColor = '#3498DB';
                     embedTitle = `${EMOJIS.TICKET_TOOL} AÇÃO DE MODERAÇÃO`;
-                    embedDescription = `Uma ação foi registrada no sistema`;
+                    embedDescription = `Uma ação foi registrada`;
             }
 
             const embed = new EmbedBuilder()
@@ -599,98 +564,47 @@ class LogManager {
                 .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
                 .addFields(
                     { name: '👤 Usuário', value: `${user.tag}\n(${user.id})`, inline: true },
-                    { name: `${EMOJIS.STAFF} Staff Responsável`, value: `${staff.tag}\n(${staff.id})`, inline: true },
+                    { name: `${EMOJIS.STAFF} Staff`, value: `${staff.tag}\n(${staff.id})`, inline: true },
                     { name: '📅 Data/Hora', value: formatDateBrazilian(new Date()), inline: true }
                 );
 
             if (action === 'ADDWARN') {
                 embed.addFields(
                     { name: `${EMOJIS.TICKET_TOOL} ID do Warn`, value: `\`${details.warnId}\``, inline: true },
-                    { name: '⚠️ Warns Atuais', value: `${details.warnCount}/3`, inline: true },
-                    { name: '📝 Motivo', value: details.reason || 'Não especificado', inline: false },
-                    { name: '📊 Status do Usuário', value: this.getStatusEmoji(details.warnCount), inline: true }
+                    { name: '⚠️ Warns', value: `${details.warnCount}/3`, inline: true },
+                    { name: '📝 Motivo', value: details.reason || 'Não especificado', inline: false }
                 );
             } else if (action === 'REMOVEWARN') {
                 embed.addFields(
                     { name: `${EMOJIS.TICKET_TOOL} Warn Removido`, value: `\`${details.warnId}\``, inline: true },
-                    { name: '📝 Motivo Original', value: details.originalReason || 'Não especificado', inline: false },
-                    { name: '⚠️ Warns Restantes', value: `${details.warnCount}/3`, inline: true },
-                    { name: '📊 Novo Status', value: this.getStatusEmoji(details.warnCount), inline: true }
+                    { name: '⚠️ Warns Restantes', value: `${details.warnCount}/3`, inline: true }
                 );
             } else if (action === 'KICK') {
                 embed.addFields(
-                    { name: '🚫 Motivo da Expulsão', value: details.reason || 'Limite de warns excedido', inline: false },
-                    { name: '⚠️ Total de Warns', value: `${details.warnCount}/3`, inline: true },
-                    { name: `${EMOJIS.TICKET_TOOL} Último Warn`, value: `\`${details.lastWarnId}\``, inline: true }
+                    { name: '🚫 Motivo', value: details.reason || 'Limite de warns excedido', inline: false },
+                    { name: '⚠️ Total de Warns', value: `${details.warnCount}/3`, inline: true }
                 );
             }
 
-            if (details.consequences && details.consequences.length > 0) {
-                embed.addFields({
-                    name: '⚡ Ações Aplicadas',
-                    value: details.consequences.map(c => `• ${c}`).join('\n'),
-                    inline: false
-                });
-            }
-
-            if (details.errors && details.errors.length > 0) {
-                embed.addFields({
-                    name: `${EMOJIS.EMOJI_40} Erros Encontrados`,
-                    value: details.errors.map(e => `• ${e}`).join('\n').substring(0, 1024),
-                    inline: false
-                });
-                embed.setColor('#E74C3C');
-            }
-
-            embed.setFooter({ text: `${EMOJIS.BOT} Sistema de Moderação • ID: ${details.warnId || 'N/A'}`, iconURL: this.client.user.displayAvatarURL() })
-                .setTimestamp();
+            embed.setFooter({ text: `${EMOJIS.BOT} Sistema de Moderação` }).setTimestamp();
 
             await logChannel.send({ embeds: [embed] });
-            console.log(chalk.cyan(`${EMOJIS.GIT}[LOG] ${action} registrado no canal #${logChannel.name}`));
             return { success: true };
 
         } catch (error) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO LOG]`) + chalk.red(` Falha ao enviar log: ${error.message}`));
-            return { success: false, error: error.message };
+            return { success: false };
         }
     }
 
     getStatusEmoji(warnCount) {
         if (warnCount === 0) return `${EMOJIS.EMOJI_43} Limpo`;
-        if (warnCount === 1) return `${EMOJIS.EMOJI_41} Nível 1 - Atenção`;
-        if (warnCount === 2) return `${EMOJIS.EMOJI_42} Nível 2 - Crítico`;
-        return `${EMOJIS.EMOJI_40} Nível 3 - Banido`;
+        if (warnCount === 1) return `${EMOJIS.EMOJI_41} Nível 1`;
+        if (warnCount === 2) return `${EMOJIS.EMOJI_42} Nível 2`;
+        return `${EMOJIS.EMOJI_40} Nível 3`;
     }
 
     async sendErrorLog(command, error, user, interaction) {
-        try {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO DETALHADO]`));
-            console.log(chalk.red(`├─ Comando: ${command}`));
-            console.log(chalk.red(`├─ Usuário: ${user?.tag || 'Desconhecido'}`));
-            console.log(chalk.red(`├─ Mensagem: ${error.message}`));
-            console.log(chalk.red(`└─ Stack: ${error.stack?.split('\n')[1]?.trim() || 'N/A'}`));
-
-            if (LOG_CHANNEL_ID && LOG_CHANNEL_ID !== 'id_do_canal_de_logs') {
-                const logChannel = await this.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-                if (logChannel) {
-                    const errorEmbed = new EmbedBuilder()
-                        .setColor('#E74C3C')
-                        .setTitle(`${EMOJIS.EMOJI_40} ERRO NO SISTEMA`)
-                        .setDescription(`Ocorreu um erro durante a execução do comando \`${command}\``)
-                        .addFields(
-                            { name: '📝 Comando', value: command, inline: true },
-                            { name: '👤 Usuário', value: user?.tag || 'Desconhecido', inline: true },
-                            { name: `${EMOJIS.EMOJI_40} Erro`, value: `\`\`\`js\n${error.message.substring(0, 500)}\`\`\``, inline: false }
-                        )
-                        .setFooter({ text: `${EMOJIS.BOT} Stack: ${error.stack?.split('\n')[1]?.trim() || 'N/A'}` })
-                        .setTimestamp();
-
-                    await logChannel.send({ embeds: [errorEmbed] });
-                }
-            }
-        } catch (logError) {
-            console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Falha ao logar erro: ${logError.message}`));
-        }
+        console.log(chalk.red(`✗ Erro em ${command}: ${error.message}`));
     }
 }
 
@@ -708,12 +622,12 @@ const commands = [
                 .setRequired(true))
         .addBooleanOption(option =>
             option.setName('detalhado')
-                .setDescription('Mostrar informações detalhadas (padrão: false)')
+                .setDescription('Mostrar informações detalhadas')
                 .setRequired(false)),
 
     new SlashCommandBuilder()
         .setName('addwarn')
-        .setDescription(`${EMOJIS.EMOJI_40} Adiciona uma advertência a um usuário (Staff apenas)`)
+        .setDescription(`${EMOJIS.EMOJI_40} Adiciona uma advertência a um usuário`)
         .addUserOption(option =>
             option.setName('usuario')
                 .setDescription('Usuário que receberá a advertência')
@@ -724,24 +638,24 @@ const commands = [
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('detalhes')
-                .setDescription('Detalhes adicionais (opcional)')
+                .setDescription('Detalhes adicionais')
                 .setRequired(false)),
 
     new SlashCommandBuilder()
         .setName('removewarn')
-        .setDescription(`${EMOJIS.EMOJI_43} Remove a ÚLTIMA advertência de um usuário (Staff apenas)`)
+        .setDescription(`${EMOJIS.EMOJI_43} Remove a ÚLTIMA advertência de um usuário`)
         .addUserOption(option =>
             option.setName('usuario')
                 .setDescription('Usuário que terá a última advertência removida')
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('motivo')
-                .setDescription('Motivo da remoção (opcional)')
+                .setDescription('Motivo da remoção')
                 .setRequired(false))
 ];
 
 // ============================================
-// VERIFICAÇÃO DE PERMISSÃO STAFF
+// VERIFICAÇÃO DE PERMISSÃO STAFF - SIMPLIFICADA
 // ============================================
 
 async function checkStaffPermission(interaction) {
@@ -751,55 +665,27 @@ async function checkStaffPermission(interaction) {
         const member = interaction.member;
         
         if (!member) {
-            console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Membro não encontrado na interação`));
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} ERRO`)
-                .setDescription('Não foi possível verificar suas permissões. Tente novamente.')
+                .setDescription('Não foi possível verificar suas permissões.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return false;
         }
 
         if (!STAFF_ROLES || STAFF_ROLES.length === 0) {
-            console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO CONFIG]`) + chalk.red(' STAFF_ROLES não configurado corretamente'));
-            
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} ERRO DE CONFIGURAÇÃO`)
-                .setDescription('Os cargos de staff não foram configurados corretamente no código')
-                .addFields(
-                    { name: '🔧 Solução', value: 'Configure o array `STAFF_ROLES` com os IDs dos cargos de staff', inline: false },
-                    { name: '📝 Como obter o ID', value: '1. Ative o Modo Desenvolvedor no Discord\n2. Clique com botão direito no cargo\n3. Copiar ID', inline: false }
-                )
-                .setFooter({ text: `${EMOJIS.BOT} Contate um administrador do servidor` })
+                .setDescription('Os cargos de staff não foram configurados.')
                 .setTimestamp();
-
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return false;
         }
 
-        let staffRoleName = 'Cargo Staff';
-        
         const memberRoles = member.roles.cache;
         const hasStaffRole = memberRoles.some(role => STAFF_ROLES.includes(role.id));
-        
-        const userStaffRole = memberRoles.find(role => STAFF_ROLES.includes(role.id));
-        if (userStaffRole) {
-            staffRoleName = userStaffRole.name;
-        } else if (STAFF_ROLES.length > 0) {
-            try {
-                const firstRole = await interaction.guild.roles.fetch(STAFF_ROLES[0]);
-                if (firstRole) staffRoleName = firstRole.name;
-            } catch (error) {
-                console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] Falha ao buscar cargo: ${error.message}`));
-            }
-        }
-        
-        console.log(chalk.cyan(`${EMOJIS.GIT}[DEBUG PERMISSÃO]`));
-        console.log(chalk.gray(`├─ Usuário: ${member.user.tag}`));
-        console.log(chalk.gray(`├─ Cargo Staff Nome: ${staffRoleName}`));
-        console.log(chalk.gray(`├─ Tem cargo staff? ${hasStaffRole ? 'SIM ✓' : 'NÃO ✗'}`));
         
         if (!hasStaffRole) {
             const denyEmbed = new EmbedBuilder()
@@ -807,32 +693,22 @@ async function checkStaffPermission(interaction) {
                 .setTitle(`${EMOJIS.EMOJI_40} ACESSO NEGADO`)
                 .setDescription('Você não tem permissão para executar este comando.')
                 .addFields(
-                    { name: '🔑 Cargos Necessários', value: `\`${staffRoleName}\` e/ou outros cargos de staff`, inline: true },
-                    { name: `${EMOJIS.STAFF} Seus Cargos`, value: memberRoles.map(r => `\`${r.name}\``).join(', ') || '`Nenhum cargo`', inline: false },
-                    { name: '📌 Ação', value: 'Este comando é restrito à equipe de moderação', inline: false }
+                    { name: '🔑 Permissão Necessária', value: 'Cargo de Staff', inline: true }
                 )
-                .setFooter({ text: `${EMOJIS.BOT} Sistema de Moderação • ${member.user.tag}`, iconURL: member.user.displayAvatarURL() })
                 .setTimestamp();
-
             await interaction.reply({ embeds: [denyEmbed], ephemeral: true });
-            console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO NEGADA]`) + chalk.yellow(` ${member.user.tag} tentou usar ${interaction.commandName} sem cargo staff`));
             return false;
         }
 
-        console.log(chalk.green(`${EMOJIS.EMOJI_43}[PERMISSÃO OK] ${member.user.tag} (${staffRoleName}) autorizado para ${interaction.commandName}`));
         return true;
 
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO FATAL]`) + chalk.red(` checkStaffPermission: ${error.message}`));
-        console.log(chalk.gray(error.stack));
-        
         const errorEmbed = new EmbedBuilder()
             .setColor('#E74C3C')
-            .setTitle(`${EMOJIS.EMOJI_40} ERRO AO VERIFICAR PERMISSÃO`)
-            .setDescription(`Ocorreu um erro ao verificar suas permissões.\n\`\`\`${error.message}\`\`\``)
+            .setTitle(`${EMOJIS.EMOJI_40} ERRO`)
+            .setDescription(`Erro ao verificar permissão: ${error.message}`)
             .setTimestamp();
-        
-        await interaction.reply({ embeds: [errorEmbed], ephemeral: true }).catch(() => {});
+        await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
         return false;
     }
 }
@@ -862,22 +738,17 @@ async function checkBotPermissionsForAction(interaction, action) {
             const permEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} PERMISSÕES INSUFICIENTES`)
-                .setDescription('O bot não possui as permissões necessárias para executar esta ação.')
+                .setDescription('O bot não possui as permissões necessárias.')
                 .addFields(
-                    { name: '🔧 Permissões Faltando', value: missingPerms.map(p => `\`${p}\``).join(', '), inline: false },
-                    { name: '📌 Solução', value: 'Adicione as permissões mencionadas ao bot no servidor', inline: false }
+                    { name: '🔧 Permissões Faltando', value: missingPerms.map(p => `\`${p}\``).join(', '), inline: false }
                 )
-                .setFooter({ text: `${EMOJIS.BOT} Contate um administrador do servidor` })
                 .setTimestamp();
-
             await interaction.reply({ embeds: [permEmbed], ephemeral: true });
-            console.log(chalk.bgYellow.black(`${EMOJIS.STAFF_YELLOW}[PERMISSÃO]`) + chalk.yellow(` Bot sem permissões: ${missingPerms.join(', ')}`));
             return false;
         }
 
         return true;
     } catch (error) {
-        console.log(chalk.red(`${EMOJIS.EMOJI_40}[ERRO] checkBotPermissionsForAction: ${error.message}`));
         return false;
     }
 }
@@ -895,7 +766,7 @@ async function handleWarnStats(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} ERRO`)
-                .setDescription('Usuário não encontrado. Por favor, tente novamente.')
+                .setDescription('Usuário não encontrado.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -905,8 +776,7 @@ async function handleWarnStats(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} OPERAÇÃO INVÁLIDA`)
-                .setDescription('Bots não podem receber ou possuir advertências.')
-                .addFields({ name: '📌 Informação', value: 'O sistema de warns é apenas para usuários humanos.', inline: false })
+                .setDescription('Bots não podem receber advertências.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -923,9 +793,7 @@ async function handleWarnStats(interaction) {
             member = await interaction.guild.members.fetch(targetUser.id);
             joinDate = member.joinedAt;
             roles = member.roles.cache.filter(r => r.name !== '@everyone').map(r => r.toString()).slice(0, 5);
-        } catch (error) {
-            console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[AVISO] Não foi possível buscar membro ${targetUser.id}: ${error.message}`));
-        }
+        } catch (error) {}
 
         if (warnCount === 0) {
             const cleanEmbed = new EmbedBuilder()
@@ -935,99 +803,64 @@ async function handleWarnStats(interaction) {
                 .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
                 .addFields(
                     { name: '👤 Usuário', value: `${targetUser.tag}`, inline: true },
-                    { name: '🆔 ID', value: `\`${targetUser.id}\``, inline: true },
-                    { name: '⚠️ Total de Warns', value: '**0** - Histórico limpo', inline: true },
-                    { name: '📊 Status', value: `${EMOJIS.EMOJI_43} Aprovado`, inline: true },
-                    { name: '📅 Entrada no Servidor', value: joinDate ? `<t:${Math.floor(joinDate.getTime() / 1000)}:R>` : 'Não disponível', inline: true }
+                    { name: '⚠️ Total de Warns', value: '**0**', inline: true },
+                    { name: '📊 Status', value: `${EMOJIS.EMOJI_43} Limpo`, inline: true }
                 )
-                .setFooter({ text: `${EMOJIS.BOT} Sistema de Moderação • Consulta por ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+                .setFooter({ text: `${EMOJIS.BOT} Consulta por ${interaction.user.tag}` })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [cleanEmbed], ephemeral: true });
-            console.log(chalk.green(`${EMOJIS.EMOJI_43}[WARNSTATS] ${interaction.user.tag} consultou ${targetUser.tag} - 0 warns`));
             return;
         }
 
         let warnsList = '';
-        let detailedInfo = '';
 
         for (let i = 0; i < warns.length; i++) {
             const warn = warns[i];
             const warnIconLevel = i === 0 ? EMOJIS.EMOJI_41 : (i === 1 ? EMOJIS.EMOJI_42 : EMOJIS.EMOJI_40);
             
-            warnsList += `${warnIconLevel} **Warn #${warn.warnNumber}** - \`${warn.id}\`\n`;
+            warnsList += `${warnIconLevel} **#${warn.warnNumber}** - \`${warn.id}\`\n`;
             warnsList += `   📝 ${warn.reason}\n`;
             warnsList += `   📅 ${warn.formattedDate}\n`;
             warnsList += `   ${EMOJIS.STAFF} ${warn.staffName}\n`;
-            
-            if (detailed) {
-                detailedInfo += `\`\`\`ansi\n[1;33m[WARN ${warn.warnNumber}][0m\n`;
-                detailedInfo += `[32mID:[0m ${warn.id}\n`;
-                detailedInfo += `[36mMotivo:[0m ${warn.reason}\n`;
-                detailedInfo += `[35mData:[0m ${warn.formattedDate}\n`;
-                detailedInfo += `[34mStaff:[0m ${warn.staffName}\n`;
-                detailedInfo += `[33mTimestamp:[0m ${new Date(warn.date).getTime()}\n\`\`\`\n`;
-            } else {
-                if (i < warns.length - 1) warnsList += '\n';
-            }
+            if (i < warns.length - 1) warnsList += '\n';
         }
 
         let statusMessage = '';
         let statusColor = '';
         if (warnCount === 1) {
-            statusMessage = `${EMOJIS.EMOJI_41} ATENÇÃO - Primeira Advertência`;
+            statusMessage = `${EMOJIS.EMOJI_41} Primeira Advertência`;
             statusColor = '#F1C40F';
         } else if (warnCount === 2) {
-            statusMessage = `${EMOJIS.EMOJI_42} CRÍTICO - Segunda Advertência`;
+            statusMessage = `${EMOJIS.EMOJI_42} Segunda Advertência`;
             statusColor = '#E67E22';
         } else {
-            statusMessage = `${EMOJIS.EMOJI_40} MÁXIMO - Limite Atingido`;
+            statusMessage = `${EMOJIS.EMOJI_40} Limite Atingido`;
             statusColor = '#E74C3C';
         }
 
         const statsEmbed = new EmbedBuilder()
             .setColor(statusColor)
             .setTitle(`${warnIcon} HISTÓRICO DE ADVERTÊNCIAS`)
-            .setDescription(`**Usuário:** ${targetUser.tag}\n**Total de Advertências:** ${warnCount}/3`)
+            .setDescription(`**Usuário:** ${targetUser.tag}\n**Total:** ${warnCount}/3`)
             .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
             .addFields(
                 { name: '👤 Usuário', value: `${targetUser.tag}`, inline: true },
-                { name: '🆔 ID', value: `\`${targetUser.id}\``, inline: true },
-                { name: '⚠️ Total de Warns', value: `**${warnCount}**/3`, inline: true },
-                { name: '📊 Status Atual', value: statusMessage, inline: false },
-                { name: '📋 ÚLTIMOS WARNS', value: warnsList.substring(0, 1024) || 'Nenhum warn detalhado', inline: false }
-            );
-
-        if (detailed && detailedInfo) {
-            statsEmbed.addFields({ name: '📄 INFORMAÇÕES DETALHADAS', value: detailedInfo.substring(0, 1024), inline: false });
-        }
-
-        if (roles.length > 0) {
-            statsEmbed.addFields({ name: '🎭 Cargos Principais', value: roles.join(', '), inline: false });
-        }
-
-        statsEmbed
-            .setFooter({ text: `${EMOJIS.BOT} Consulta por ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+                { name: '⚠️ Total', value: `**${warnCount}**/3`, inline: true },
+                { name: '📊 Status', value: statusMessage, inline: false },
+                { name: '📋 WARNS', value: warnsList.substring(0, 1024) || 'Nenhum', inline: false }
+            )
+            .setFooter({ text: `${EMOJIS.BOT} Consulta por ${interaction.user.tag}` })
             .setTimestamp();
 
         await interaction.reply({ embeds: [statsEmbed], ephemeral: true });
-        console.log(chalk.green(`${EMOJIS.EMOJI_43}[WARNSTATS] ${interaction.user.tag} consultou ${targetUser.tag} - ${warnCount} warns`));
 
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO]`) + chalk.red(` handleWarnStats: ${error.message}`));
-        console.log(chalk.gray(error.stack));
-        await logManager.sendErrorLog('/warnstats', error, interaction.user, interaction);
-
         const errorEmbed = new EmbedBuilder()
             .setColor('#E74C3C')
-            .setTitle(`${EMOJIS.EMOJI_40} ERRO AO CONSULTAR`)
-            .setDescription('Ocorreu um erro ao buscar o histórico de advertências.')
-            .addFields(
-                { name: '🔧 Detalhes Técnicos', value: `\`\`\`${error.message.substring(0, 200)}\`\`\``, inline: false },
-                { name: '📌 Sugestão', value: 'Tente novamente ou contate um administrador.', inline: false }
-            )
+            .setTitle(`${EMOJIS.EMOJI_40} ERRO`)
+            .setDescription('Ocorreu um erro ao buscar o histórico.')
             .setTimestamp();
-
         await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }
 }
@@ -1052,7 +885,7 @@ async function handleAddWarn(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} ERRO`)
-                .setDescription('Usuário não encontrado. Verifique e tente novamente.')
+                .setDescription('Usuário não encontrado.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1063,13 +896,8 @@ async function handleAddWarn(interaction) {
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} OPERAÇÃO INVÁLIDA`)
                 .setDescription('Não é possível adicionar advertências a bots.')
-                .addFields(
-                    { name: '🤖 Bots', value: 'Bots são automaticamente excluídos do sistema de warns.', inline: false },
-                    { name: '📌 Motivo', value: 'Apenas usuários humanos podem receber advertências.', inline: false }
-                )
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-            console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[ADDWARN] Tentativa de warn em bot ${targetUser.tag} por ${interaction.user.tag}`));
             return;
         }
 
@@ -1078,7 +906,7 @@ async function handleAddWarn(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} USUÁRIO NÃO ENCONTRADO`)
-                .setDescription('O usuário não está mais no servidor ou não pôde ser encontrado.')
+                .setDescription('O usuário não está mais no servidor.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1089,7 +917,6 @@ async function handleAddWarn(interaction) {
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} AUTO-ADVERTÊNCIA`)
                 .setDescription('Você não pode adicionar uma advertência a si mesmo.')
-                .addFields({ name: '📌 Regra', value: 'Staff não pode aplicar warns em si mesmo.', inline: false })
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1103,7 +930,7 @@ async function handleAddWarn(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} FALHA AO ADICIONAR WARN`)
-                .setDescription(`Ocorreu um erro ao tentar adicionar a advertência.\n\`\`\`${result.error}\`\`\``)
+                .setDescription(`Erro: ${result.error}`)
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1114,12 +941,6 @@ async function handleAddWarn(interaction) {
 
         const punishmentResults = await punishmentManager.processPunishments(member, warnCount, fullReason, warnId);
 
-        const consequences = [];
-        if (punishmentResults.rolesUpdated) consequences.push(`${EMOJIS.EMOJI_43} Cargos de warn atualizados`);
-        if (punishmentResults.dmSent) consequences.push(`${EMOJIS.TICKET_TOOL} DM de aviso enviada`);
-        if (punishmentResults.kicked) consequences.push(`${EMOJIS.EMOJI_40} Usuário expulso do servidor`);
-        if (punishmentResults.errors.length > 0) consequences.push(...punishmentResults.errors.map(e => `${EMOJIS.EMOJI_40} ${e}`));
-
         let embedColor;
         let embedTitle;
         let embedDescription;
@@ -1128,18 +949,18 @@ async function handleAddWarn(interaction) {
         if (warnCount === 1) {
             embedColor = '#F1C40F';
             embedTitle = `${EMOJIS.EMOJI_41} ADVERTÊNCIA REGISTRADA - NÍVEL 1`;
-            embedDescription = `Uma advertência foi adicionada ao usuário **${targetUser.tag}**`;
-            actionMessage = 'O usuário recebeu o cargo de advertência nível 1.';
+            embedDescription = `Advertência adicionada a **${targetUser.tag}**`;
+            actionMessage = 'Cargo de advertência nível 1 aplicado.';
         } else if (warnCount === 2) {
             embedColor = '#E67E22';
             embedTitle = `${EMOJIS.EMOJI_42} SEGUNDA ADVERTÊNCIA - NÍVEL 2`;
-            embedDescription = `Uma segunda advertência foi registrada para **${targetUser.tag}**`;
-            actionMessage = '• Uma mensagem de aviso foi enviada via DM\n• Cargos de advertência foram atualizados\n• Próxima advertência resultará em expulsão';
+            embedDescription = `Segunda advertência para **${targetUser.tag}**`;
+            actionMessage = '• DM de aviso enviada\n• Próxima advertência = expulsão';
         } else {
             embedColor = '#E74C3C';
             embedTitle = `${EMOJIS.EMOJI_40} LIMITE MÁXIMO ATINGIDO - EXPULSÃO`;
-            embedDescription = `**${targetUser.tag}** atingiu o limite máximo de 3 advertências`;
-            actionMessage = '• O usuário foi **EXPULSO** do servidor\n• Uma mensagem de notificação foi enviada\n• Todos os cargos de warn foram removidos';
+            embedDescription = `**${targetUser.tag}** atingiu o limite de 3 advertências`;
+            actionMessage = '• Usuário EXPULSO do servidor';
         }
 
         const responseEmbed = new EmbedBuilder()
@@ -1148,14 +969,14 @@ async function handleAddWarn(interaction) {
             .setDescription(embedDescription)
             .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
             .addFields(
-                { name: '👤 Usuário', value: `${targetUser.tag}\n(${targetUser.id})`, inline: true },
-                { name: `${EMOJIS.STAFF} Staff Responsável`, value: `${interaction.user.tag}\n(${interaction.user.id})`, inline: true },
-                { name: `${EMOJIS.TICKET_TOOL} ID do Warn`, value: `\`${warnId}\``, inline: true },
-                { name: '⚠️ Total de Warns', value: `${warnCount}/3`, inline: true },
+                { name: '👤 Usuário', value: `${targetUser.tag}`, inline: true },
+                { name: `${EMOJIS.STAFF} Staff`, value: `${interaction.user.tag}`, inline: true },
+                { name: `${EMOJIS.TICKET_TOOL} ID`, value: `\`${warnId}\``, inline: true },
+                { name: '⚠️ Total', value: `${warnCount}/3`, inline: true },
                 { name: '📝 Motivo', value: fullReason.length > 100 ? fullReason.substring(0, 100) + '...' : fullReason, inline: false },
-                { name: '⚡ Ações Aplicadas', value: actionMessage, inline: false }
+                { name: '⚡ Ações', value: actionMessage, inline: false }
             )
-            .setFooter({ text: `${EMOJIS.BOT} Sistema de Moderação • ${formatDateBrazilian(new Date())}`, iconURL: interaction.guild.iconURL() })
+            .setFooter({ text: `${EMOJIS.BOT} ${formatDateBrazilian(new Date())}` })
             .setTimestamp();
 
         await interaction.reply({ embeds: [responseEmbed], ephemeral: true });
@@ -1163,28 +984,15 @@ async function handleAddWarn(interaction) {
         await logManager.sendModerationLog(targetUser, interaction.user, 'ADDWARN', {
             warnId: warnId,
             warnCount: warnCount,
-            reason: fullReason,
-            consequences: consequences,
-            errors: punishmentResults.errors
+            reason: fullReason
         });
 
-        console.log(chalk.bgGreen.black(`${EMOJIS.EMOJI_43}[ADDWARN] ${interaction.user.tag} deu warn em ${targetUser.tag} - Total: ${warnCount}/3`));
-
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO FATAL]`) + chalk.red(` handleAddWarn: ${error.message}`));
-        console.log(chalk.gray(error.stack));
-        await logManager.sendErrorLog('/addwarn', error, interaction.user, interaction);
-
         const errorEmbed = new EmbedBuilder()
             .setColor('#E74C3C')
             .setTitle(`${EMOJIS.EMOJI_40} ERRO CRÍTICO`)
-            .setDescription('Ocorreu um erro inesperado ao processar o comando.')
-            .addFields(
-                { name: '🔧 Detalhes', value: `\`\`\`${error.message.substring(0, 300)}\`\`\``, inline: false },
-                { name: '📌 Ação', value: 'Contate um administrador e tente novamente.', inline: false }
-            )
+            .setDescription(`Erro: ${error.message}`)
             .setTimestamp();
-
         await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }
 }
@@ -1218,7 +1026,7 @@ async function handleRemoveWarn(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} OPERAÇÃO INVÁLIDA`)
-                .setDescription('Bots não possuem advertências para remover.')
+                .setDescription('Bots não possuem advertências.')
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1230,24 +1038,22 @@ async function handleRemoveWarn(interaction) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} NENHUM WARN ENCONTRADO`)
-                .setDescription(`O usuário **${targetUser.tag}** não possui nenhuma advertência registrada.`)
+                .setDescription(`**${targetUser.tag}** não possui advertências.`)
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
         }
 
-        // Pega o warn mais recente (último da lista)
         const lastWarn = currentWarns[currentWarns.length - 1];
         const warnId = lastWarn.id;
 
-        // Remove o warn mais recente
         const result = await warnManager.removeWarn(targetUser.id, warnId, interaction.user.id, interaction.user.tag);
 
         if (!result.success) {
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
                 .setTitle(`${EMOJIS.EMOJI_40} FALHA AO REMOVER WARN`)
-                .setDescription(`Não foi possível remover a advertência.\n\`\`\`${result.error}\`\`\``)
+                .setDescription(`Erro: ${result.error}`)
                 .setTimestamp();
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
@@ -1256,51 +1062,43 @@ async function handleRemoveWarn(interaction) {
         const newWarnCount = result.totalWarns;
         const removedWarn = result.removedWarn;
 
-        // Atualiza os cargos do usuário
-        let roleUpdateResult = { success: true, errors: [] };
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         if (member) {
-            roleUpdateResult = await punishmentManager.applyWarnRole(member, newWarnCount);
+            await punishmentManager.applyWarnRole(member, newWarnCount);
         }
 
-        // Define a cor e mensagem de status
         let embedColor;
         let statusMessage;
 
         if (newWarnCount === 0) {
             embedColor = '#2ECC71';
-            statusMessage = `${EMOJIS.EMOJI_43} Histórico completamente limpo - Sem advertências`;
+            statusMessage = `${EMOJIS.EMOJI_43} Histórico limpo`;
         } else if (newWarnCount === 1) {
             embedColor = '#F1C40F';
-            statusMessage = `${EMOJIS.EMOJI_41} Nível 1 - Atenção moderada`;
+            statusMessage = `${EMOJIS.EMOJI_41} Nível 1`;
         } else if (newWarnCount === 2) {
             embedColor = '#E67E22';
-            statusMessage = `${EMOJIS.EMOJI_42} Nível 2 - Situação crítica`;
+            statusMessage = `${EMOJIS.EMOJI_42} Nível 2`;
         } else {
             embedColor = '#E74C3C';
-            statusMessage = `${EMOJIS.EMOJI_40} Nível 3 - Limite máximo`;
+            statusMessage = `${EMOJIS.EMOJI_40} Nível 3`;
         }
 
         const responseEmbed = new EmbedBuilder()
             .setColor(embedColor)
             .setTitle(`${EMOJIS.EMOJI_43} ADVERTÊNCIA REMOVIDA`)
-            .setDescription(`A última advertência foi removida do histórico de **${targetUser.tag}**`)
+            .setDescription(`A última advertência foi removida de **${targetUser.tag}**`)
             .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
             .addFields(
-                { name: '👤 Usuário', value: `${targetUser.tag}\n(${targetUser.id})`, inline: true },
-                { name: `${EMOJIS.STAFF} Staff Responsável`, value: `${interaction.user.tag}\n(${interaction.user.id})`, inline: true },
+                { name: '👤 Usuário', value: `${targetUser.tag}`, inline: true },
+                { name: `${EMOJIS.STAFF} Staff`, value: `${interaction.user.tag}`, inline: true },
                 { name: `${EMOJIS.TICKET_TOOL} Warn Removido`, value: `\`${removedWarn.id}\``, inline: true },
                 { name: '📝 Motivo Original', value: removedWarn.reason.length > 100 ? removedWarn.reason.substring(0, 100) + '...' : removedWarn.reason, inline: false },
-                { name: '📌 Motivo da Remoção', value: removalReason, inline: false },
                 { name: '⚠️ Warns Restantes', value: `${newWarnCount}/3`, inline: true },
-                { name: '📊 Status Atual', value: statusMessage, inline: true }
+                { name: '📊 Status', value: statusMessage, inline: true }
             )
-            .setFooter({ text: `${EMOJIS.BOT} Remoção registrada em ${formatDateBrazilian(new Date())}`, iconURL: interaction.guild.iconURL() })
+            .setFooter({ text: `${EMOJIS.BOT} Remoção registrada em ${formatDateBrazilian(new Date())}` })
             .setTimestamp();
-
-        if (!roleUpdateResult.success) {
-            responseEmbed.addFields({ name: `${EMOJIS.EMOJI_42} Alerta de Cargos`, value: `Não foi possível atualizar os cargos: ${roleUpdateResult.error}`, inline: false });
-        }
 
         await interaction.reply({ embeds: [responseEmbed], ephemeral: true });
 
@@ -1308,21 +1106,14 @@ async function handleRemoveWarn(interaction) {
             warnId: removedWarn.id,
             warnCount: newWarnCount,
             originalReason: removedWarn.reason,
-            removalReason: removalReason,
-            consequences: [`Warn ${removedWarn.id} removido do histórico`, `Total de warns agora: ${newWarnCount}/3`]
+            removalReason: removalReason
         });
 
-        console.log(chalk.bgYellow.black(`${EMOJIS.EMOJI_42}[REMOVEWARN] ${interaction.user.tag} removeu o último warn de ${targetUser.tag} - Restam: ${newWarnCount}`));
-
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO FATAL]`) + chalk.red(` handleRemoveWarn: ${error.message}`));
-        console.log(chalk.gray(error.stack));
-        await logManager.sendErrorLog('/removewarn', error, interaction.user, interaction);
-
         const errorEmbed = new EmbedBuilder()
             .setColor('#E74C3C')
             .setTitle(`${EMOJIS.EMOJI_40} ERRO AO REMOVER`)
-            .setDescription(`\`\`\`${error.message.substring(0, 300)}\`\`\``)
+            .setDescription(`Erro: ${error.message}`)
             .setTimestamp();
         await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }
@@ -1335,8 +1126,6 @@ async function handleRemoveWarn(interaction) {
 async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
 
-    console.log(chalk.cyan(`${EMOJIS.GIT}[COMANDO] ${interaction.user.tag} executou /${interaction.commandName}`));
-
     switch (interaction.commandName) {
         case 'warnstats':
             await handleWarnStats(interaction);
@@ -1348,7 +1137,7 @@ async function handleInteraction(interaction) {
             await handleRemoveWarn(interaction);
             break;
         default:
-            console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[AVISO] Comando desconhecido: ${interaction.commandName}`));
+            console.log(chalk.yellow(`⚠ Comando desconhecido: ${interaction.commandName}`));
     }
 }
 
@@ -1360,21 +1149,16 @@ async function registerGlobalCommands() {
     try {
         const rest = new REST({ version: '10' }).setToken(TOKEN);
         
-        console.log(chalk.blue(`${EMOJIS.GIT}[REGISTRO]`) + ' Iniciando registro de comandos slash globais...');
-        console.log(chalk.gray(`├─ Total de comandos: ${commands.length}`));
-        console.log(chalk.gray(`├─ Cliente ID: ${CLIENT_ID}`));
-        console.log(chalk.gray(`└─ Tipo: Global (todos servidores)`));
+        console.log(chalk.blue('✓ Registrando comandos slash...'));
 
         await rest.put(
             Routes.applicationCommands(CLIENT_ID),
             { body: commands.map(cmd => cmd.toJSON()) }
         );
 
-        console.log(chalk.green(`${EMOJIS.EMOJI_43}[SUCESSO]`) + ' Comandos slash registrados globalmente com sucesso!');
-        console.log(chalk.gray('   Os comandos estarão disponíveis em alguns minutos para todos os servidores.'));
+        console.log(chalk.green('✓ Comandos registrados com sucesso!'));
     } catch (error) {
-        console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO REGISTRO]`) + chalk.red(` Falha ao registrar comandos: ${error.message}`));
-        console.log(chalk.gray(error.stack));
+        console.log(chalk.red(`✗ Erro ao registrar comandos: ${error.message}`));
     }
 }
 
@@ -1397,21 +1181,15 @@ const punishmentManager = new PunishmentManager(client, warnManager);
 const logManager = new LogManager(client);
 
 client.once('ready', async () => {
-    console.log(chalk.bgGreen.black('\n═══════════════════════════════════════════════════'));
-    console.log(chalk.bgGreen.black('            BOT INICIADO COM SUCESSO                 '));
-    console.log(chalk.bgGreen.black('═══════════════════════════════════════════════════\n'));
+    console.log(chalk.green(`\n✓ Bot online: ${client.user.tag}`));
+    console.log(chalk.gray(`✓ Servidores: ${client.guilds.cache.size}`));
     
-    console.log(chalk.green(`${EMOJIS.BOT}[BOT] Logado como: ${chalk.bold(client.user.tag)}`));
-    console.log(chalk.green(`${EMOJIS.BOT}[BOT] ID: ${chalk.gray(client.user.id)}`));
-    console.log(chalk.green(`${EMOJIS.BOT}[BOT] Servidores: ${chalk.bold(client.guilds.cache.size)}`));
-    console.log(chalk.green(`${EMOJIS.BOT}[BOT] Usuários totais: ${chalk.bold(client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0))}`));
-    
-    console.log(chalk.cyan('\n[CONFIGURAÇÃO]'));
-    console.log(chalk.gray(`├─ ${EMOJIS.STAFF} STAFF_ROLES: ${STAFF_ROLES.length > 0 ? '✓ Configurado (' + STAFF_ROLES.length + ' cargos)' : '✗ Não configurado'}`));
-    console.log(chalk.gray(`├─ ${EMOJIS.EMOJI_41} WARN_1: ${WARN_1 && WARN_1 !== 'id_do_cargo_warn_1' ? '✓ Configurado' : '✗ Não configurado'}`));
-    console.log(chalk.gray(`├─ ${EMOJIS.EMOJI_42} WARN_2: ${WARN_2 && WARN_2 !== 'id_do_cargo_warn_2' ? '✓ Configurado' : '✗ Não configurado'}`));
-    console.log(chalk.gray(`├─ ${EMOJIS.EMOJI_40} WARN_3: ${WARN_3 && WARN_3 !== 'id_do_cargo_warn_3' ? '✓ Configurado' : '✗ Não configurado'}`));
-    console.log(chalk.gray(`└─ ${EMOJIS.TICKET_TOOL} LOG_CHANNEL_ID: ${LOG_CHANNEL_ID && LOG_CHANNEL_ID !== 'id_do_canal_de_logs' ? '✓ Configurado' : '✗ Não configurado'}`));
+    console.log(chalk.cyan('\n[CONFIG]'));
+    console.log(chalk.gray(`  STAFF_ROLES: ${STAFF_ROLES.length > 0 ? '✓' : '✗'}`));
+    console.log(chalk.gray(`  WARN_1: ${WARN_1 && WARN_1 !== 'id_do_cargo_warn_1' ? '✓' : '✗'}`));
+    console.log(chalk.gray(`  WARN_2: ${WARN_2 && WARN_2 !== 'id_do_cargo_warn_2' ? '✓' : '✗'}`));
+    console.log(chalk.gray(`  WARN_3: ${WARN_3 && WARN_3 !== 'id_do_cargo_warn_3' ? '✓' : '✗'}`));
+    console.log(chalk.gray(`  LOG_CHANNEL: ${LOG_CHANNEL_ID && LOG_CHANNEL_ID !== 'id_do_canal_de_logs' ? '✓' : '✗'}\n`));
     
     loadWarnsDatabase();
     await registerGlobalCommands();
@@ -1422,13 +1200,13 @@ client.once('ready', async () => {
     
     client.user.setPresence({
         activities: [{
-            name: `${commands.length} comandos | /warnstats`,
+            name: `/addwarn | /removewarn`,
             type: 3
         }],
         status: 'online'
     });
     
-    console.log(chalk.green(`\n${EMOJIS.EMOJI_43}[STATUS] Bot pronto e aguardando comandos!\n`));
+    console.log(chalk.green('✓ Bot pronto!\n'));
 });
 
 client.on('interactionCreate', handleInteraction);
@@ -1437,16 +1215,8 @@ client.on('guildMemberAdd', async (member) => {
     const warns = await warnManager.getUserWarns(member.id);
     if (warns.length > 0) {
         await punishmentManager.applyWarnRole(member, warns.length);
-        console.log(chalk.cyan(`${EMOJIS.GIT}[RECONEXÃO] ${member.user.tag} reconectou com ${warns.length} warns - Cargos restaurados`));
+        console.log(chalk.blue(`✓ Cargos restaurados: ${member.user.tag} (${warns.length} warns)`));
     }
-});
-
-client.on('error', (error) => {
-    console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[CLIENTE ERRO]`) + chalk.red(` ${error.message}`));
-});
-
-client.on('rateLimit', (rateLimitInfo) => {
-    console.log(chalk.yellow(`${EMOJIS.EMOJI_42}[RATE LIMIT] Timeout: ${rateLimitInfo.timeout}, Rota: ${rateLimitInfo.route}`));
 });
 
 // ============================================
@@ -1457,38 +1227,24 @@ setInterval(() => {
     saveWarnsDatabase();
 }, 300000);
 
-setInterval(async () => {
-    const stats = {
-        totalUsers: warnsDatabase.size,
-        totalWarns: 0
-    };
-    for (const warns of warnsDatabase.values()) {
-        stats.totalWarns += warns.length;
-    }
-    console.log(chalk.gray(`${EMOJIS.GIT}[STATS] ${new Date().toLocaleTimeString()} - ${stats.totalUsers} usuários | ${stats.totalWarns} warns totais`));
-}, 3600000);
-
 // ============================================
 // TRATAMENTO DE SINAIS DO SISTEMA
 // ============================================
 
 process.on('SIGINT', () => {
-    console.log(chalk.yellow(`\n${EMOJIS.EMOJI_42}[SHUTDOWN] Salvando dados antes de encerrar...`));
+    console.log(chalk.yellow('\n⚠ Salvando dados...'));
     saveWarnsDatabase();
-    console.log(chalk.green(`${EMOJIS.EMOJI_43}[SHUTDOWN] Dados salvos. Encerrando bot...`));
+    console.log(chalk.green('✓ Encerrando bot...\n'));
     process.exit(0);
 });
 
 process.on('uncaughtException', (error) => {
-    console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[UNCAUGHT EXCEPTION]`));
-    console.log(chalk.red(` Mensagem: ${error.message}`));
-    console.log(chalk.gray(error.stack));
+    console.log(chalk.red(`✗ Erro não tratado: ${error.message}`));
     saveWarnsDatabase();
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[UNHANDLED REJECTION]`));
-    console.log(chalk.red(` Razão: ${reason}`));
+process.on('unhandledRejection', (reason) => {
+    console.log(chalk.red(`✗ Promise rejeitada: ${reason}`));
     saveWarnsDatabase();
 });
 
@@ -1496,11 +1252,10 @@ process.on('unhandledRejection', (reason, promise) => {
 // INICIALIZAÇÃO DO BOT
 // ============================================
 
-console.log(chalk.blue(`\n${EMOJIS.GIT}[INICIANDO] Carregando bot...\n`));
+console.log(chalk.blue('\n✓ Iniciando bot...\n'));
 
 client.login(TOKEN).catch(error => {
-    console.log(chalk.bgRed.white(`${EMOJIS.EMOJI_40}[ERRO FATAL]`) + chalk.red(` Não foi possível fazer login: ${error.message}`));
-    console.log(chalk.gray('Verifique seu TOKEN no arquivo .env'));
+    console.log(chalk.red(`✗ Falha no login: ${error.message}`));
     process.exit(1);
 });
 
