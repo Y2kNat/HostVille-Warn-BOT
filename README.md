@@ -1,4 +1,3 @@
-
 <p align="center">
   <img src="https://cdn.discordapp.com/attachments/1481730240236752906/1490186146557202542/2caafef3b98fb7ca780403088149bce9.png?ex=69d3237f&is=69d1d1ff&hm=325cab5741420b06e38c8860feac3aa9699d1a89271f44e94d68998535a63f5a&" width="100%">
 </p>
@@ -50,9 +49,9 @@ Ele permite que usuários avaliem a equipe com notas e comentários, gerando mé
 
 ✦ 𝚂𝚈𝚂𝚃𝙴𝙼 𝙵𝙻𝙾𝚆
 
-
+```mermaid
 sequenceDiagram
-    participant U as Usuário (comum)
+    participant U as Usuário
     participant B as Bot
     participant DB as JSON Storage
     participant Log as Canal de Logs
@@ -72,6 +71,7 @@ sequenceDiagram
         B->>B: Recalcula ranking semanal
         B-->>U: Confirmação ephemeral
     end
+```
 
 ---
 
@@ -174,3 +174,25 @@ sequenceDiagram
 🟢 Online • ⚡ Estável • 🔒 Seguro
 
 𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝
+
+```⚡ Redução de chamadas API
+
+---
+
+✦ 𝙊𝘽𝙅𝙀𝘾𝙏𝙄𝙑𝙀
+
+✔ Melhorar a qualidade da staff
+✔ Coletar feedback real dos usuários
+✔ Automatizar métricas
+✔ Criar competitividade saudável
+✔ Evitar abuso de API
+
+---
+
+📌 Status
+
+🟢 Online • ⚡ Estável • 🔒 Seguro
+
+𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝
+
+```
