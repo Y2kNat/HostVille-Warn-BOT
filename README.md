@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-4f46e5?style=for-the-badge">
+  <img src="https://img.shields.io/badge/version-9.0.0-4f46e5?style=for-the-badge">
   <img src="https://img.shields.io/badge/node-16.9%2B-22c55e?style=for-the-badge">
   <img src="https://img.shields.io/badge/discord.js-v14-5865F2?style=for-the-badge">
   <img src="https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge">
@@ -13,10 +13,10 @@
 
 <br>
 
-<h1 align="center">𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎 𝚆𝚊𝚛𝚗 • 𝙱𝙾𝚃</h1>
+<h1 align="center">⭐ 𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎 𝚁𝚎𝚟𝚒𝚎𝚠 • 𝙱𝙾𝚃</h1>
 
 <p align="center">
-  Sistema avançado de moderação com warns automáticos, punições inteligentes e logs completos para Discord.
+  Sistema avançado de avaliação de staff com ranking semanal, cache inteligente e proteção anti rate-limit.
 </p>
 
 <p align="center">
@@ -27,113 +27,151 @@
 
 ## ✦ 𝙰𝙱𝙾𝚄𝚃
 
-> O **HostVille Warn • BOT** é um sistema de moderação moderno criado em **Node.js + discord.js v14**, focado em automação total de warns e controle de staff.
+> O **HostVille Review • BOT** é um sistema moderno de avaliação criado em **Node.js + discord.js v14**, focado em feedback da comunidade para membros da staff.
 
-Ele elimina o trabalho manual e transforma a moderação em algo rápido, organizado e automático.
+Ele permite que usuários avaliem a equipe com notas e comentários, gerando métricas, rankings e estatísticas automáticas.
 
 ---
 
 ## ✦ 𝙵𝙴𝙰𝚃𝚄𝚁𝙴𝚂
 
-<p align="center"><b>⚡ Sistema completo de moderação ⚡</b></p>
-
 ```txt
-⚠ WARN SYSTEM      → Histórico completo por usuário
-🛡 AUTO PUNISH     → Cargos e kick automático
-📜 LOG SYSTEM      → Registro de todas ações
-📩 DM SYSTEM       → Notificações automáticas
-👮 STAFF CONTROL   → Permissões por cargos
-💾 DATABASE        → JSON persistente
-
-
----
-
-✦ 𝙿𝚄𝙽𝙸𝚂𝙷𝙼𝙴𝙽𝚃 𝚂𝚈𝚂𝚃𝙴𝙼
-
-╭────────────────────╮
-│  1 WARN  → WARN_1  │
-│  2 WARNS → WARN_2  │ + DM
-│  3 WARNS → WARN_3  │ + KICK
-╰────────────────────╯
-
-
----
-
-✦ 𝙲𝙾𝙼𝙼𝙰𝙽𝙳𝚂
-
-/warnstats
-
-📊 Histórico completo do usuário
-• Total de warns
-• Lista detalhada
-• Status atual
-
-
----
-
-/addwarn
-
-➕ Adiciona advertência
-• Motivo
-• ID único
-• Punição automática
-• Log staff
-
-
----
-
-/removewarn
-
-➖ Remove último warn
-• Atualiza histórico
-• Recalcula punições
-• Remove cargos
-• Registra log
-
-
----
-
-✦ 𝚂𝚃𝙰𝙵𝙵 𝙿𝙴𝚁𝙼𝙸𝚂𝚂𝙸𝙾𝙽𝚂
-
----
-
-✦ 𝙵𝙻𝙾𝚆 𝚂𝚈𝚂𝚃𝙴𝙼
-```
-flowchart TD
-A[Warn aplicado] --> B[Salvo no JSON]
-B --> C[Atualiza contagem]
-C --> D{Level}
-D -->|1| E[WARN_1]
-D -->|2| F[WARN_2 + DM]
-D -->|3| G[WARN_3 + KICK]
+⭐ REVIEW SYSTEM    → Avaliação de 0 a 10
+📊 STATS SYSTEM     → Estatísticas detalhadas
+🏆 RANKING WEEKLY   → Top 3 semanal automático
+📦 CACHE SYSTEM     → Cache inteligente (anti rate-limit)
+🛡 PERMISSION       → Bloqueio para staff avaliar
+📩 LOG SYSTEM       → Logs completos de avaliações
+💾 DATABASE         → JSON persistente
+🧠 ANTI SPAM        → Limite diário de avaliações
 ```
 
 ---
 
-✦ 𝙳𝙰𝚃𝙰𝙱𝙰𝚂𝙴
+✦ 𝚂𝚈𝚂𝚃𝙴𝙼 𝙵𝙻𝙾𝚆
 
-📁 warns.json
-• Leve
-• Rápido
-• Persistente
-• Fácil manutenção
+```mermaid
+sequenceDiagram
+    participant U as Usuário (comum)
+    participant B as Bot
+    participant DB as JSON Storage
+    participant Log as Canal de Logs
 
+    U->>B: Clica "Avaliar equipe"
+    B->>U: Menu dropdown (staff disponível)
+    U->>B: Seleciona membro da staff
+    B->>U: Modal (Nota 0-10 + Feedback)
+    U->>B: Envia avaliação
+    B->>B: Valida nota (0-10)
+    alt Nota inválida ou limite diário
+        B-->>U: Erro ephemeral
+    else Avaliação válida
+        B->>DB: Salva nova review (reviews.json)
+        B->>DB: Atualiza stats.json
+        B->>Log: Log detalhado da avaliação
+        B->>B: Recalcula ranking semanal
+        B-->>U: Confirmação ephemeral
+    end
+```
 
 ---
 
-✦ 𝙾𝙱𝙹𝙴𝙲𝚃𝙸𝚅𝙴
+✦ 𝙍𝘼𝙉𝙆𝙄𝙉𝙂 𝙎𝙀𝙈𝘼𝙉𝘼𝙇
 
-✔ Automação de moderação
-✔ Organização da staff
-✔ Redução de trabalho manual
-✔ Punições consistentes
+```
+╭────────────────────────╮
+│ 🥇 Top 1 → Melhor média │
+│ 🥈 Top 2 → Segundo lugar │
+│ 🥉 Top 3 → Terceiro     │
+╰────────────────────────╯
+✔ Atualizado automaticamente
+✔ Baseado nas avaliações da semana
+✔ Enviado no canal de logs
+```
 
+---
+
+✦ 𝘾𝙊𝙈𝙈𝘼𝙉𝘿𝙎
+
+/stats
+
+📊 Estatísticas do usuário
+• Média de notas
+• Mediana
+• Melhor / pior nota
+• Últimas avaliações
+
+/ranking
+
+🏆 Ranking semanal
+• Top 3 staff
+• Média de avaliações
+• Total de reviews
+
+/clear
+
+🗑️ Limpa mensagens de um usuário
+• Apenas staff
+• Limite configurável
+• Log automático
+
+/clearall
+
+🧹 Limpa canal completo
+• Apenas staff
+• Até 500 mensagens
+• Ignora fixadas
+
+---
+
+✦ 𝙋𝙀𝙍𝙈𝙄𝙎𝙎𝙄𝙊𝙉𝙎
+
+👮 STAFF
+✔ Pode usar comandos de moderação
+✔ NÃO pode avaliar outros staff
+
+👤 USUÁRIOS
+✔ Podem avaliar staff
+✔ Limite de 10 avaliações por dia
+
+---
+
+✦ 𝘿𝘼𝙏𝘼𝘽𝘼𝙎𝙀
+
+📁 data/reviews.json
+• Armazena todas avaliações
+
+📁 data/stats.json
+• Estatísticas globais
+
+✔ Leve
+✔ Rápido
+✔ Persistente
+✔ Fácil manutenção
+
+---
+
+✦ 𝘼𝙉𝙏𝙄 𝙍𝘼𝙏𝙀 𝙇𝙄𝙈𝙄𝙏
+
+📦 Cache de membros staff (5 min)
+⏱ Delay entre requisições
+🔄 Atualização automática
+⚡ Redução de chamadas API
+
+---
+
+✦ 𝙊𝘽𝙅𝙀𝘾𝙏𝙄𝙑𝙀
+
+✔ Melhorar a qualidade da staff
+✔ Coletar feedback real dos usuários
+✔ Automatizar métricas
+✔ Criar competitividade saudável
+✔ Evitar abuso de API
 
 ---
 
 📌 Status
 
-🟢 Online • ⚡ Estável • 🔒 Seguro 
+🟢 Online • ⚡ Estável • 🔒 Seguro
 
-𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝 
-```
+𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝
