@@ -1,0 +1,13 @@
+# Segredos — nunca versionar
+.env
+.env.*
+!.env.example
+
+# Dependências
+node_modules/
+
+# Runtime / dados locais
+warns.json
+logs/
+backups/
+*.log
